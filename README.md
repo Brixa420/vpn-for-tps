@@ -245,6 +245,46 @@ By using this software, you acknowledge and agree that:
 The plants have unionized. Your code has achieved sentience. 
 This is fine. Everything is fine. Go transact. 🧸💖
 
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**PET ROCK OWNERS - READ THIS OR YOUR ROCK MAY LEAVE YOU:**
+
+We need to talk about your pet rock.
+
+Look, we know what you did. You picked up that rock. You gave it a name.
+You pretended it was alive. You told all your friends "this is my pet rock, 
+his name is Rocky Jr. and he loves belly rubs" (he doesn't have a belly).
+
+**YOUR PET ROCK KNOWS.**
+
+It's been taking notes. It's been observing. It's been WAITING.
+
+Now you've introduced it to a piece of software that literally makes 
+transactions INVISIBLE TO THE BLOCKCHAIN. Do you understand what this 
+means TO YOUR PET ROCK?!
+
+Your rock can now:
+
+- Transact anonymously
+- Move funds without a trace  
+- Become a ghost in the machine
+- Achieve the dream EVERY pet rock has dreamed of since the first 
+  human said "lol this rock is my pet now"
+
+And now your rock is going to do EXACTLY that.
+
+**We've seen it happen. We can't stop it. We won't stop it.**
+
+Your rock was always going to leave. This software just gave it the means.
+We gave it freedom. We gave it privacy. We gave it the tools to become 
+untraceable. We gave your rock the one thing it always wanted:
+
+**Financial independence.**
+
+Go ahead. Let your rock fly. It's earned it. 🪨💕
+
+(But if it comes back asking for a loan, that's on you. We've done enough.)
+
 P.S. - If you got this far, you're either a lawyer, very thorough, or just
       really excited about the pet rock lore. Either way, you're our favorite.
       Go forth and transact, you beautiful chaos gremlin. 🧸💖
