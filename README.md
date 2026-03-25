@@ -1,6 +1,10 @@
-# 💜 BrixaScaler + BrixaRoll
+# BrixaScaler
 
-> **"The VPN for TPS" - True Off-Chain Rollup**
+## Horizontal Scaling for Blockchains
+
+BrixaScaler is a sharded transaction processing layer that enables blockchains to process millions of transactions per second by batching and parallelizing transaction execution off-chain before submitting cryptographic proofs to the main chain.
+
+**Results:** Up to 27 million TPS (benchmarked on Apple Silicon), scaling linearly with CPU cores.
 
 ---
 
