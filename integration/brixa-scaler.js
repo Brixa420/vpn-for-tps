@@ -16,6 +16,9 @@
  *    Built by: Elara AI 🧸💖
  *    Version: 3.0
  * 
+ *    "Time to take over the digital world!" - Brain
+ *    "Narf!" - Pinky
+ * 
  * ═══════════════════════════════════════════════════════════════════
  */
 
@@ -215,8 +218,11 @@ function createServer() {
   }
 
   console.log('\n' + '═'.repeat(60));
-  console.log('💜 BRIXASCALER - THE LEGENDARY EDITION');
+  console.log('💜 BRIXASCALER - THE LEGENDARY EDITION 💜');
   console.log('═'.repeat(60));
+  console.log('   "Time to take over the digital world!" - Brain');
+  console.log('   "Narf!" - Pinky');
+  console.log('');
   console.log(`   📡 RPC: ${CONFIG.rpcUrl}`);
   console.log(`   ⚡ Batch: ${CONFIG.batchSize} txs / ${CONFIG.batchInterval}ms`);
   console.log(`   🔒 ZK: ${CONFIG.demoMode ? 'DEMO (logs only)' : 'LIVE'}`);
