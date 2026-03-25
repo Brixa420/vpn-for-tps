@@ -123,7 +123,12 @@ Instead of 1,000 separate transactions:
 ```bash
 git clone https://github.com/Brixa420/vpn-for-tps.git
 cd vpn-for-tps/integration
+
+# Just run! (no API key needed)
 node server.js --chain ethereum
+
+# Or as validator sidecar:
+node sidecar.js --chain ethereum
 ```
 
 ### 2. Connect Wallet

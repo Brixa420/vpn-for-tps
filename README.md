@@ -28,10 +28,10 @@ That's it! Your transactions now flow through BrixaScaler.
 
 ### Option 2: Validator Sidecar (Production)
 ```bash
-# Install alongside existing validator
-cd vpn-for-tps/integration
+# Install alongside existing validator - just run!
+node sidecar.js --chain ethereum
 
-# Run as sidecar - enhance your existing node
+# Or to enhance your own validator:
 node sidecar.js --chain ethereum --original-rpc http://your-validator:8546 --port 8545
 
 # Your validator now has transaction batching!

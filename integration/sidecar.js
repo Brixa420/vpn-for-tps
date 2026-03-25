@@ -2,19 +2,20 @@
  * BrixaScaler Sidecar - Run alongside existing validator
  * 
  * Usage:
- *   node sidecar.js --chain ethereum --original-rpc http://validator:8546 --port 8545
+ *   node sidecar.js --chain ethereum --port 8545
  * 
- * This enhances an existing validator with transaction batching.
+ * That's it! Uses public RPC as default. To enhance your own validator:
+ *   node sidecar.js --chain ethereum --original-rpc http://your-validator:8546 --port 8545
  */
 
 const http = require('http');
-const { BrixaScaler } = require('./brixa-scaler');
+const { BrixaScaler, PUBLIC_RPCS } = require('./brixa-scaler');
 
 // Parse args
 const args = process.argv.slice(2);
 const config = {
   chain: 'ethereum',
-  originalRpc: null,
+  originalRpc: null,  // Will default to public RPC
   port: 8545,
   shards: 100,
   batchSize: 1000
@@ -30,23 +31,27 @@ for (let i = 0; i < args.length; i += 2) {
   if (key === 'batch-size') config.batchSize = parseInt(value);
 }
 
-// Validate
-if (!config.originalRpc) {
-  console.log('Usage: node sidecar.js --chain ethereum --original-rpc http://validator:8546 [--port 8545]');
-  console.log('\nExample for Ethereum validator:');
-  console.log('  node sidecar.js --chain ethereum --original-rpc http://localhost:8546 --port 8545');
-  console.log('\nThis runs BrixaScaler on port 8545, forwarding to your validator on 8546');
-  process.exit(1);
-}
-
 async function main() {
   console.log('\n' + '═'.repeat(50));
   console.log('💜 BrixaScaler Sidecar - Validator Enhancement');
   console.log('═'.repeat(50));
   console.log(`   Chain: ${config.chain}`);
-  console.log(`   Original RPC: ${config.originalRpc}`);
   console.log(`   Listen on: ${config.port}`);
   console.log('');
+
+  // Default to public RPC if no original provided
+  if (!config.originalRpc) {
+    const publicRpcs = PUBLIC_RPCS[config.chain.toLowerCase()];
+    if (publicRpcs && publicRpcs[0]) {
+      config.originalRpc = publicRpcs[0];
+      console.log(`   Using public RPC: ${config.originalRpc}\n`);
+    } else {
+      console.log('⚠️  No public RPC found for this chain');
+      console.log('   Use --original-rpc to specify your validator\n');
+    }
+  } else {
+    console.log(`   Original RPC: ${config.originalRpc}`);
+  }
 
   // Create scaler
   const scaler = new BrixaScaler(config.chain, {
