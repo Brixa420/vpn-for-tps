@@ -10,22 +10,36 @@ BrixaScaler is a sharded transaction processing layer that enables blockchains t
 
 ## 🚀 Roadmap
 
-### Phase 1 — Core Infrastructure (Complete ✅)
+### Phase 1 — Core Infrastructure ✅ COMPLETE
+
 - [x] Sharded transaction processing (10+ shards)
 - [x] Merkle tree construction (parallel)
-- [x] ZK proof generation (snarkjs)
+- [x] ZK proof generation (snarkjs + Circom)
+- [x] Trusted setup ceremony (Phase 1 + Phase 2)
 - [x] Go implementation (27M TPS)
 - [x] Hardware scaling benchmarks
 
 ### Phase 2 — Production Ready
+
 - [x] REST API for tx submission (Go HTTP server)
-- [ ] Multi-node cluster deployment
+- [ ] **In Progress:** Multi-node cluster deployment
+- [ ] Integration with ZK prover (proof submission)
+- [ ] On-chain verification testing (Verifier.sol)
 - [ ] 100M+ TPS on server hardware
 
-### Phase 3 — Multi-Chain
-- [ ] EVM chain support
-- [ ] Solana compatibility
+### Phase 3 — Multi-Chain Support
+
+- [ ] EVM chain integration (Ethereum, BSC, Polygon)
+- [ ] Solana SVM compatibility
+- [ ] Cosmos/SDK chain support
+- [ ] Bitcoin ordinals/batching
+
+### Phase 4 — Advanced Features
+
 - [ ] GPU acceleration for ZK proofs
+- [ ] Privacy tx support (shielded pools)
+- [ ] Cross-shard atomic swaps
+- [ ] Fraud proof system
 
 ---
 
@@ -80,11 +94,9 @@ Each additional core adds ~2-3M TPS with sharding.
 
 ---
 
-Two versions for maximum chaos:
+## Architecture
 
----
-
-## 🚀 BrixaRoll (Recommended - TRUE OFF-CHAIN)
+### BrixaRoll (Recommended - TRUE OFF-CHAIN)
 
 **The chain barely knows you exist.**
 
@@ -117,7 +129,7 @@ WALLET ──► 1000 TXS ──► BRIXAROLL (OFF-CHAIN)
 
 ---
 
-## ⚡ BrixaScaler (Batching)
+### ⚡ BrixaScaler (Batching)
 
 **Simpler, less efficient, still fast.**
 
@@ -271,8 +283,25 @@ integration/
 ├── server.js          # Basic proxy
 └── sidecar.js        # Validator sidecar
 
+integration/go/
+├── merkle-parallel.go # Parallel Merkle tree
+├── sharded-merkle.go  # Horizontal scaling
+└── server.go         # HTTP API server
+
+keys/
+├── circuits/         # Circom circuits
+│   └── batch_merkle.circom
+├── pot14_0000.ptau   # Phase 1
+├── pot14_final.ptau  # Phase 2
+├── batch_merkle_0000.zkey
+├── batch_merkle_final.zkey
+├── verification_key.json
+└── contracts/
+    └── Verifier.sol  # Solidity verifier
+
 contracts/
-└── BrixaRollup.sol   # Smart contract for rollup
+├── BrixaRollup.sol   # Rollup contract
+└── Verifier.sol      # ZK verifier
 ```
 
 ## 🏗️ Architecture
@@ -322,6 +351,46 @@ node brixaroll.js --rpc https://eth.llamarpc.com --workers 8 --shards 10000
 | `--max-shards` | 10000 | Auto-scale limit |
 | `--batch-size` | 1000 | Txs per proof |
 | `--batch-interval` | 1000 | MS between batches |
+
+---
+
+## 🔐 ZK Proof System
+
+### Trusted Setup
+
+The circuit uses a multi-party trusted setup:
+
+```bash
+# Phase 1 (powers of tau)
+snarkjs powersoftau new bn128 14 pot14_0000.ptau
+snarkjs powersoftau contribute pot14_0000.ptau pot14_0001.ptau --name="Contributor 1" -e="entropy"
+
+# Phase 2 (circuit-specific)
+snarkjs groth16 setup batch_merkle.r1cs pot14_final.ptau batch_merkle_0000.zkey
+snarkjs zkey contribute batch_merkle_0000.zkey batch_merkle_final.zkey --name="BrixaScaler" -e="wrathofcali_zk_prover_2026"
+snarkjs zkey export verificationkey batch_merkle_final.zkey verification_key.json
+```
+
+### Circuit
+
+- **File:** `keys/circuits/batch_merkle.circom`
+- **Constraints:** 4,880 non-linear
+- **Wires:** 10,442
+- **Hash:** Poseidon (circomlib)
+
+### Verification
+
+```bash
+# Generate proof
+snarkjs groth16 fullprove input.json batch_merkle.wasm batch_merkle_final.zkey proof.json public.json
+
+# Verify locally
+snarkjs groth16 verify verification_key.json public.json proof.json
+
+# On-chain (Verifier.sol)
+```
+
+---
 
 ## License
 
