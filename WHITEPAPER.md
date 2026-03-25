@@ -134,6 +134,33 @@ Send transactions as usual. Brixa handles the batching.
 
 ---
 
+## Use Cases
+
+### Use Case 1: Wallet Middleware (Default)
+```
+Wallet → BrixaScaler → Blockchain
+```
+Your wallet connects to BrixaScaler instead of directly to the blockchain. BrixaScaler batches your transactions.
+
+### Use Case 2: Validator Sidecar (Production)
+```
+Validator Node → BrixaScaler (sidecar) → Original RPC
+```
+Run BrixaScaler alongside your existing validator node. It enhances throughput without replacing your setup.
+
+**Example:**
+```bash
+# Your validator runs on port 8546
+# Run BrixaScaler sidecar on 8545, forwarding to 8546
+node sidecar.js --chain ethereum --original-rpc http://localhost:8546 --port 8545
+
+# Now your validator has transaction batching!
+```
+
+This upgrades **any** validator running on any chain - just point BrixaScaler at it!
+
+---
+
 ## API
 
 ### JavaScript Library
