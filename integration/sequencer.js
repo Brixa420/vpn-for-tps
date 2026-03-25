@@ -398,25 +398,129 @@ class Sequencer {
   }
 
   /**
+   * Connect to brixaroll for proof fetching
+   */
+  async connectToBrixaRoll(brixarollUrl) {
+    this.brixarollUrl = brixarollUrl;
+    console.log(`🔗 Connected to brixaroll at ${brixarollUrl}`);
+  }
+
+  /**
+   * Fetch proof from brixaroll and submit to L1
+   */
+  async fetchProofAndSubmit() {
+    if (!this.brixarollUrl) {
+      console.log('⚠️ Not connected to brixaroll');
+      return null;
+    }
+
+    try {
+      // Fetch proof from brixaroll API
+      const response = await fetch(`${this.brixarollUrl}/proof`);
+      const data = await response.json();
+
+      if (!data.success) {
+        return null; // No proofs available
+      }
+
+      const proof = data.proof;
+      
+      // Get current state from L1 first
+      const l1State = await this.syncFromL1();
+      
+      // Generate ZK proof for the batch
+      const zkProof = await this.generateProof(
+        proof.previousRoot,
+        proof.newRoot,
+        proof.batchHash,
+        proof.batchId
+      );
+
+      // Submit to L1
+      return await this.submitToL1(zkProof, proof);
+      
+    } catch (e) {
+      console.error('❌ Failed to fetch proof from brixaroll:', e.message);
+      return null;
+    }
+  }
+
+  /**
+   * Submit batch to L1
+   */
+  async submitToL1(proof, proofData) {
+    if (this.demoMode || !this.signer || !this.contractAddress) {
+      console.log(`📤 [L1 Submit] Demo - would submit batch ${proofData.batchId}`);
+      console.log(`   Root: ${proofData.newRoot?.slice(0, 16)}...`);
+      console.log(`   TXs:  ${proofData.txCount}`);
+      this.batchCount++;
+      return { batchId: proofData.batchId, demo: true };
+    }
+
+    try {
+      const contract = new ethers.Contract(
+        this.contractAddress,
+        ['function submitBatch(uint256[2],uint256[2][2],uint256[2],uint256[4],bytes)'],
+        this.signer
+      );
+
+      const input = [
+        proofData.previousRoot,
+        proofData.newRoot,
+        proofData.batchHash,
+        proofData.batchId
+      ];
+
+      const tx = await contract.submitBatch(
+        proof.a,
+        proof.b,
+        proof.c,
+        input,
+        '0x',
+        { gasLimit: 500000 }
+      );
+
+      console.log(`✅ Batch ${proofData.batchId} submitted: ${tx.hash}`);
+      this.batchCount++;
+      
+      return { batchId: proofData.batchId, txHash: tx.hash };
+      
+    } catch (e) {
+      console.error('❌ L1 submission failed:', e.message);
+      return null;
+    }
+  }
+
+  /**
    * Start sequencer loop
    */
-  start() {
+  start(mode = 'standalone') {
     this.isRunning = true;
+    this.mode = mode;
     
     console.log('🚀 Sequencer starting...');
+    console.log(`   Mode: ${mode}`);
     console.log(`   Batch size: ${this.batchSize}`);
     console.log(`   Batch interval: ${this.batchInterval}ms`);
-    console.log(`   Mode: ${this.demoMode ? 'DEMO' : 'LIVE'}`);
+    console.log(`   Demo: ${this.demoMode}`);
     
-    // Main sequencer loop
-    setInterval(async () => {
-      if (!this.isRunning) return;
-      await this.submitBatch();
-    }, this.batchInterval);
+    if (mode === 'brixaroll' && this.brixarollUrl) {
+      // Fetch proofs from brixaroll
+      setInterval(async () => {
+        if (!this.isRunning) return;
+        await this.fetchProofAndSubmit();
+      }, this.batchInterval);
+    } else {
+      // Original: build batches locally
+      setInterval(async () => {
+        if (!this.isRunning) return;
+        await this.submitBatch();
+      }, this.batchInterval);
+    }
     
     // Stats reporting
     setInterval(() => {
-      console.log(`📊 Mempool: ${this.mempool.length} | Batches: ${this.batchCount}`);
+      console.log(`📊 Mode: ${mode} | Batches: ${this.batchCount}`);
     }, 30000);
   }
 
@@ -464,6 +568,15 @@ async function main() {
   // Register as sequencer if keys provided
   if (CONFIG.contractAddress) {
     await sequencer.registerSequencer();
+  }
+
+  // Connect to brixaroll if URL provided
+  const brixarollUrl = process.env.BRIXAROLL_URL;
+  if (brixarollUrl) {
+    await sequencer.connectToBrixaRoll(brixarollUrl);
+    sequencer.start('brixaroll');
+  } else {
+    sequencer.start('standalone');
   }
 
   // Add some test transactions

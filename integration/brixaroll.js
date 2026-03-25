@@ -381,6 +381,23 @@ if (cluster.isMaster) {
     });
     workers.push(w);
     console.log(`   ✅ Started worker ${i + 1}/${CONFIG.workers}`);
+    
+    // Listen for proofs from this worker
+    w.on('message', (msg) => {
+      if (msg.type === 'proof' && msg.proof) {
+        // Update state and store proof for sequencer
+        batchCount++;
+        currentStateRoot = msg.proof.root || '0x' + '0'.repeat(64);
+        pendingProofs.push({
+          batchId: batchCount,
+          previousRoot: msg.proof.previousRoot || currentStateRoot,
+          newRoot: msg.proof.root,
+          batchHash: msg.proof.batchHash,
+          txCount: msg.proof.txCount,
+          timestamp: Date.now()
+        });
+      }
+    });
   }
 
   // Close the async function
@@ -562,6 +579,64 @@ if (cluster.isMaster) {
     console.log(`   📡 RPC Server: http://localhost:${CONFIG.port + 1}`);
   });
 
+  // Proof API endpoint (for sequencer to fetch batches)
+  const proofServer = http.createServer(async (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Content-Type', 'application/json');
+    
+    const url = new URL(req.url, 'http://localhost');
+    
+    // GET /proof - Get latest proof for L1 submission
+    if (url.pathname === '/proof' && req.method === 'GET') {
+      const proofData = pendingProofs.shift();
+      if (proofData) {
+        res.end(JSON.stringify({ success: true, proof: proofData }));
+      } else {
+        res.end(JSON.stringify({ success: false, error: 'No proofs available' }));
+      }
+      return;
+    }
+    
+    // GET /state - Get current state root
+    if (url.pathname === '/state' && req.method === 'GET') {
+      res.end(JSON.stringify({
+        stateRoot: currentStateRoot,
+        batchCount: batchCount,
+        pendingProofs: pendingProofs.length
+      }));
+      return;
+    }
+    
+    // POST /tx - Submit transaction
+    if (url.pathname === '/tx' && req.method === 'POST') {
+      let body = '';
+      req.on('data', c => body += c);
+      req.on('end', () => {
+        const workerIndex = currentWorker % workers.length;
+        currentWorker++;
+        workers[workerIndex].send({ type: 'tx', data: body });
+        res.end(JSON.stringify({ 
+          jsonrpc: '2.0', 
+          id: JSON.parse(body).id, 
+          result: '0x' + crypto.randomBytes(8).toString('hex') 
+        }));
+      });
+      return;
+    }
+    
+    res.writeHead(404);
+    res.end(JSON.stringify({ error: 'Not found' }));
+  });
+
+  // Store pending proofs for sequencer
+  const pendingProofs = [];
+  let currentStateRoot = '0x' + '0'.repeat(64);
+  let batchCount = 0;
+
+  proofServer.listen(CONFIG.port + 2, () => {
+    console.log(`   🔗 Proof API: http://localhost:${CONFIG.port + 2} (for sequencer)`);
+  });
+
 } else {
   // ============================================
   // WORKER PROCESS
@@ -598,6 +673,11 @@ if (cluster.isMaster) {
   setInterval(() => {
     const stats = worker.getStats();
     process.send({ type: 'stats', workerId, ...stats });
+    // Report any pending proofs
+    if (worker.pendingProof) {
+      process.send({ type: 'proof', proof: worker.pendingProof });
+      worker.pendingProof = null;
+    }
   }, 5000);
 }
 
