@@ -1,6 +1,8 @@
 # BrixaScaler - VPN for TPS
 ## A Drop-In Transaction Scaling Middleware
 
+> **Proof of Concept** - For experienced developers to finish
+
 > **Add infinite TPS to any blockchain - no code changes required**
 
 **Author: Laura Wolf (Brixa420)**
@@ -202,6 +204,30 @@ Transactions are queued and logged but NOT actually submitted to the blockchain.
 - [ ] Cross-chain support
 - [ ] Performance benchmarks
 - [ ] Production-ready release
+
+---
+
+## ⚠️ Proof of Concept Status
+
+**This is a proof of concept** - a working skeleton for developers to complete.
+
+### What's Done
+- ✅ Transaction queuing and sharding
+- ✅ Batch processing logic
+- ✅ RPC proxy server
+- ✅ Public RPC integration
+- ✅ Status dashboard
+
+### What Needs Finishing
+- ❌ Real transaction signing (needs private key handling)
+- ❌ Gas estimation and fee management
+- ❌ Transaction confirmation handling
+- ❌ Distributed shard coordination
+- ❌ Cross-chain batch support
+- ❌ Production hardening
+
+### Who This Is For
+Experienced blockchain developers who want to build a transaction batching layer. The architecture is sound - the implementation needs completion.
 
 ---
 

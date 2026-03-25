@@ -1,6 +1,8 @@
 # 💜 BrixaScaler - VPN for TPS
 
-> **Add infinite transactions per second to any blockchain**
+> **Proof of Concept** - For experienced developers to finish
+
+**Add infinite transactions per second to any blockchain**
 
 BrixaScaler is a **transaction scaling middleware** that sits between your wallet and the blockchain. It queues, batches, and processes transactions to multiply your effective TPS.
 
@@ -140,6 +142,24 @@ vpn-for-tps/
 ## 📜 License
 
 MIT
+
+---
+
+## ⚠️ Proof of Concept
+
+**This is a proof of concept** - a working skeleton, not production-ready.
+
+### What's Done
+- ✅ Transaction queuing and sharding
+- ✅ Batch processing logic  
+- ✅ RPC proxy server
+- ✅ Public RPC integration
+
+### What Needs Finishing
+- ❌ Real transaction signing
+- ❌ Gas/fee management
+- ❌ Transaction confirmations
+- ❌ Distributed coordination
 
 ---
 
