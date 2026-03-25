@@ -197,6 +197,54 @@ contracts/
 └── BrixaRollup.sol   # Smart contract for rollup
 ```
 
+## 🏗️ Architecture
+
+```
+                    ┌─ Shard 1 ─→ Batch → 1 proof tx
+                    │
+User txs ────────→  ├─ Shard 2 ─→ Batch → 1 proof tx
+(hashed across)    │
+                    ├─ Shard N ─→ Batch → 1 proof tx
+                    │
+                    ▼
+              Blockchain (N proof txs)
+```
+
+**Shards**: 1000 default, auto-scales to 10000  
+**Workers**: `--workers N` for multi-core  
+**Auto-scaler**: Adds shards when queue > 5000 txs
+
+## 📡 RPC API
+
+```bash
+# Send transaction
+curl -X POST http://localhost:8545 \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"eth_sendTransaction","params":[{"to":"0x...","value":"0x1"}],"id":1}'
+```
+
+Supported: `eth_sendTransaction`, `eth_sendRawTransaction`, `eth_blockNumber`, `eth_getBalance`, `eth_call`
+
+## 🚀 Deployment
+
+```bash
+# Single worker
+node brixaroll.js --rpc https://eth.llamarpc.com
+
+# Multi-core (recommended)
+node brixaroll.js --rpc https://eth.llamarpc.com --workers 8 --shards 10000
+```
+
+## ⚙️ Configuration
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--workers` | 1 | Node.js processes |
+| `--shards` | 1000 | Shards per worker |
+| `--max-shards` | 10000 | Auto-scale limit |
+| `--batch-size` | 1000 | Txs per proof |
+| `--batch-interval` | 1000 | MS between batches |
+
 ## License
 
 **MIT License - Do whatever you want.** Just don't sue us.
