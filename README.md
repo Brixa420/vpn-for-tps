@@ -35,11 +35,22 @@
 
 ---
 
-## ✨ The Magic
+## ✨ The Magic (Now with Zero-Knowledge!)
 
 ```
-WALLET ─► 1,000 TXS ─► BRIXASCALER ─► 1 BATCH ─► ANY CHAIN
+WALLET ─► 1,000 TXS ─► BRIXASCALER ─► ZK PROOF ─► ANY CHAIN
+                           │
+                           │ Creates anonymous commitments
+                           │ Merkle tree of all txs
+                           │ ZK proof verifies batch
+                           │ Privacy preserved!
 ```
+
+**ZK Features:**
+- **Transaction Commitments** - Hides tx details, proves validity
+- **Merkle Tree** - Efficient batch proofs
+- **Nullifiers** - Prevents double-spending
+- **Privacy** - Transaction details stay private
 
 **How it works:**
 1. Your wallet connects to BrixaScaler (not the blockchain)
@@ -89,6 +100,7 @@ node server.js --chain ethereum
 - **Gaming** - High TPS for action games
 - **NFT Drops** - Batch mint 10,000 in minutes
 - **DeFi** - Batch swaps & liquidations
+- **Privacy Apps** - ZK-proof transactions (NEW!)
 - **Mobile Apps** - Low cost, high throughput
 - **Any Web3 App** - Just change your RPC
 

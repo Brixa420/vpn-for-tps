@@ -496,6 +496,9 @@ class BrixaScaler {
   }
 }
 
+// Import ZK module
+const ZK = require('./zk-prover');
+
 // Export
 module.exports = { 
   BrixaScaler, 
@@ -507,7 +510,13 @@ module.exports = {
   SECURITY,
   checkRateLimit,
   validateRPCInput,
-  validateApiKey
+  validateApiKey,
+  // ZK features
+  ZK,
+  TransactionCommitment: ZK.TransactionCommitment,
+  MerkleTree: ZK.MerkleTree,
+  BatchZKProof: ZK.BatchZKProof,
+  ZKBatchedScaler: ZK.ZKBatchedScaler
 };
 
 // Browser export
