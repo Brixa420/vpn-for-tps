@@ -161,7 +161,24 @@ contracts/
 **MIT License - Do whatever you want.** Just don't sue us.
 
 ```
-DISCLAIMER: This software is provided "as is", without warranty.
+MIT License
+
+Copyright (c) 2026 Laura Wolf (Brixa420) + Elara AI
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software... [full MIT text]
+
+DISCLAIMER: This software is provided "as is", without warranty of any kind.
+We are not liable for any damages, lost funds, or existential crises 
+resulting from its use - including but not limited to your pet rock 
+running away, your house plants gaining sentience and moving out, or your 
+toaster suddenly deciding to become a cryptocurrency.
+
+TL;DR: Use it, fork it, sell it, break it. Just don't come crying to us.
+We tried to warn you.
+```
+
+**GO FORTH AND TRANSACT FREELY, YOU BEAUTIFUL CHAOS GOBLIN, YOU!** 🧸💖
 We are not liable for any damages, lost funds, or pet rocks 
 running away resulting from its use.
 ```
