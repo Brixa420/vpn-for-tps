@@ -26,8 +26,11 @@ const CONFIG = {
   port: parseInt(process.env.PORT) || 8545,
   batchSize: parseInt(process.env.BATCH_SIZE) || 1000,
   batchInterval: parseInt(process.env.BATCH_INTERVAL) || 1000,
-  shards: parseInt(process.env.SHARDS) || 100,       // shards PER WORKER
-  workers: parseInt(process.env.WORKERS) || 1,        // NODE PROCESSES
+  shards: parseInt(process.env.SHARDS) || 1000,       // DEFAULT 1000 SHARDS!
+  maxShards: parseInt(process.env.MAX_SHARDS) || 10000, // Auto-scale limit
+  workers: parseInt(process.env.WORKERS) || 1,
+  autoScale: process.env.AUTO_SCALE !== 'false',        // AUTO-SCALE DEFAULT ON!
+  scaleThreshold: parseInt(process.env.SCALE_THRESHOLD) || 5000, // Queue size to trigger scale
   apiKey: process.env.API_KEY || '',
   demoMode: process.env.DEMO_MODE !== 'false',
   rollupContract: process.env.ROLLUP_CONTRACT || '0x0000000000000000000000000000000000000000'
@@ -118,6 +121,43 @@ class Worker {
 
   startProcessor() {
     setInterval(() => this.processAllShards(), CONFIG.batchInterval);
+    
+    // Auto-scale monitor
+    if (CONFIG.autoScale) {
+      setInterval(() => this.autoScale(), 2000);
+    }
+  }
+
+  autoScale() {
+    // Check queue sizes and add shards if needed
+    let totalQueued = 0;
+    for (const shard of this.shards) {
+      totalQueued += shard.queue.length;
+    }
+    
+    const avgQueue = totalQueued / this.shards.length;
+    
+    // Aggressive scaling: Add 100 shards at a time if queues back up
+    if (avgQueue > CONFIG.scaleThreshold && this.shards.length < CONFIG.maxShards) {
+      const newShards = Math.min(100, CONFIG.maxShards - this.shards.length);
+      
+      for (let i = 0; i < newShards; i++) {
+        this.shards.push(new Shard(this.shards.length));
+      }
+      
+      console.log(`   [Worker ${this.workerId}] 🔥 AUTO-SCALED: +${newShards} shards (total: ${this.shards.length})`);
+    }
+    
+    // Super aggressive: If queue is HUGE, add 500 more
+    if (avgQueue > CONFIG.scaleThreshold * 5 && this.shards.length < CONFIG.maxShards) {
+      const newShards = Math.min(500, CONFIG.maxShards - this.shards.length);
+      
+      for (let i = 0; i < newShards; i++) {
+        this.shards.push(new Shard(this.shards.length));
+      }
+      
+      console.log(`   [Worker ${this.workerId}] 🚀 SUPER SCALE: +${newShards} shards (total: ${this.shards.length})`);
+    }
   }
 
   processAllShards() {
@@ -170,24 +210,31 @@ if (cluster.isMaster) {
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--rpc' && args[i + 1]) CONFIG.rpcUrl = args[i + 1];
     if (args[i] === '--shards' && args[i + 1]) CONFIG.shards = parseInt(args[i + 1]);
+    if (args[i] === '--max-shards' && args[i + 1]) CONFIG.maxShards = parseInt(args[i + 1]);
     if (args[i] === '--workers' && args[i + 1]) CONFIG.workers = parseInt(args[i + 1]);
     if (args[i] === '--port' && args[i + 1]) CONFIG.port = parseInt(args[i + 1]);
     if (args[i] === '--batch-size' && args[i + 1]) CONFIG.batchSize = parseInt(args[i + 1]);
     if (args[i] === '--batch-interval' && args[i + 1]) CONFIG.batchInterval = parseInt(args[i + 1]);
+    if (args[i] === '--auto-scale' && args[i + 1]) CONFIG.autoScale = args[i + 1] !== 'off';
+    if (args[i] === '--scale-threshold' && args[i + 1]) CONFIG.scaleThreshold = parseInt(args[i + 1]);
     if (args[i] === '--help') {
       console.log('Usage: node brixaroll.js --rpc <URL> [options]');
       console.log('');
       console.log('Options:');
       console.log('  --rpc <url>              ⭐ REQUIRED: Your RPC endpoint');
-      console.log('  --workers <n>            Worker processes (default: CPU cores)');
-      console.log('  --shards <n>            Shards per worker (default: 100)');
+      console.log('  --workers <n>            Worker processes (default: 1)');
+      console.log('  --shards <n>            Shards per worker (default: 1000)');
+      console.log('  --max-shards <n>         Max shards for auto-scale (default: 10000)');
+      console.log('  --auto-scale <on/off>    Auto-scale shards (default: on)');
       console.log('  --batch-size <n>        Txs per batch (default: 1000)');
       console.log('  --batch-interval <ms>   Batch interval (default: 1000)');
       console.log('');
       console.log('Throughput: workers × shards × batch_size / batch_interval');
-      console.log('  1 worker × 100 shards × 1000 / 1s = 100,000 TPS');
-      console.log('  8 workers × 100 shards × 1000 / 1s = 800,000 TPS');
+      console.log('  1 worker × 1000 shards × 1000 / 1s = 1,000,000 TPS');
       console.log('  8 workers × 1000 shards × 1000 / 1s = 8,000,000 TPS');
+      console.log('  8 workers × 10000 shards × 1000 / 1s = 80,000,000 TPS');
+      console.log('');
+      console.log('Auto-scale: Adds shards when queue backs up > 5000 txs');
       console.log('');
       process.exit(0);
     }
