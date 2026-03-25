@@ -8,6 +8,14 @@
  *    "The chain won't know what hit it"
  *    NOW WITH TRUE PARALLEL PROCESSING (CLUSTER MODE)
  * 
+ *    ⚠️  WARNING: THIS IS A DEMO/PROOF OF CONCEPT ⚠️
+ *    ─────────────────────────────────────────────────
+ *    • Default: DEMO_MODE=true (logs, doesn't send txs)
+ *    • NOT production ready - for testing/development only
+ *    • Use: DEMO_MODE=false to actually submit transactions
+ *    • Author assumes NO LIABILITY for any losses
+ *    • Use at YOUR OWN RISK
+ * 
  * ═══════════════════════════════════════════════════════════════════
  */
 

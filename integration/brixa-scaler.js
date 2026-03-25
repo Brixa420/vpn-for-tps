@@ -7,7 +7,16 @@
  * 
  *    "The VPN for TPS" - Zero-Knowledge Transaction Batching
  * 
- *    • 1000x TPS on ANY chain
+ *    ⚠️  WARNING: THIS IS A DEMO/PROOF OF CONCEPT ⚠️
+ *    ─────────────────────────────────────────────────
+ *    • Default: DEMO_MODE=true (logs, doesn't send txs)
+ *    • NOT production ready - for testing/development only
+ *    • Use: DEMO_MODE=false to actually submit transactions
+ *    • Author assumes NO LIABILITY for any losses
+ *    • Use at YOUR OWN RISK
+ * 
+ *    Features:
+ *    • 1000x TPS on ANY chain (in theory)
  *    • Zero-Knowledge privacy
  *    • Just middleware - no new chain
  *    • Demo mode (logs, doesn't actually send)

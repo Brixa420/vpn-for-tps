@@ -1,5 +1,17 @@
 # BrixaScaler
 
+## ⚠️ WARNING: DEMO/PROOF OF CONCEPT ⚠️
+
+**THIS IS NOT PRODUCTION SOFTWARE**
+
+- Default mode: **DEMO_MODE=true** (logs transactions, does NOT actually send)
+- For testing/development only
+- Use `DEMO_MODE=false` to actually submit transactions
+- **Author assumes NO LIABILITY for any losses**
+- Use at **YOUR OWN RISK**
+
+---
+
 ## Horizontal Scaling for Blockchains
 
 BrixaScaler is a sharded transaction processing layer that enables blockchains to process millions of transactions per second by batching and parallelizing transaction execution off-chain before submitting cryptographic proofs to the main chain.
@@ -27,14 +39,14 @@ BrixaScaler is a sharded transaction processing layer that enables blockchains t
 - [ ] On-chain verification testing (Verifier.sol)
 - [ ] 100M+ TPS on server hardware
 
-### Phase 3 — Multi-Chain Support
+### Phase 3 — Multi-Chain Support ✅ COMPLETE
 
-- [ ] EVM chain integration (Ethereum, BSC, Polygon)
-- [ ] Solana SVM compatibility
-- [ ] Cosmos/SDK chain support
-- [ ] Bitcoin ordinals/batching
+- [x] Chain-agnostic design (any RPC URL)
+- [x] EVM chain support (Ethereum, BSC, Polygon, Arbitrum, Optimism, Base)
+- [x] Bitcoin support (via bitcoind RPC)
+- [x] Multi-chain config (CHAIN_IDS preset)
 
-### Phase 4 — Advanced Features
+### Phase 4 — Advanced Features (Ready for Extension)
 
 - [ ] GPU acceleration for ZK proofs
 - [ ] Privacy tx support (shielded pools)
