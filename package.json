@@ -1,0 +1,27 @@
+{
+  "name": "@brixa420/scaling-layer",
+  "version": "1.0.0",
+  "description": "Brixa - VPN for TPS. Add infinite TPS to any blockchain.",
+  "main": "integration/brixa-scaler.js",
+  "types": "package/index.d.ts",
+  "scripts": {
+    "test": "node integration/test-scaler.js",
+    "start": "node integration/server.js"
+  },
+  "keywords": [
+    "scaling",
+    "tps",
+    "ethereum",
+    "bitcoin",
+    "blockchain",
+    "layer2",
+    "brixa"
+  ],
+  "author": "Laura Wolf (Brixa420)",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {},
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
