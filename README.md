@@ -4,42 +4,20 @@
 
 - ⚡ **1000x TPS** on any chain
 - 🔐 **ZK Privacy** - Zero-knowledge commitments
-- ⛓️ **ANY CHAIN** - Just pass your RPC URL
-- 🎮 **Just Works** - Zero config
+- ⛓️ **ANY CHAIN** - Just provide your RPC
+- 🎮 **Just Works**
 
 ---
 
-## Quick Start
+## ⚠️ Required: RPC Endpoint
+
+**You must provide your own RPC URL.** This is how BrixaScaler talks to the blockchain.
 
 ```bash
-# Run with ANY RPC (chain agnostic!)
 node brixa-scaler.js --rpc https://your-rpc-url
-
-# Or with a preset chain
-node brixa-scaler.js --rpc https://eth.llamarpc.com
 ```
 
----
-
-## Chain Agnostic
-
-**Works with ANY blockchain.** Just pass your RPC URL:
-
-```bash
-# Any EVM chain
-node brixa-scaler.js --rpc https://your-evm-rpc:8546
-
-# Solana
-node brixa-scaler.js --rpc https://api.mainnet-beta.solana.com
-
-# Bitcoin
-node brixa-scaler.js --rpc http://localhost:8332
-
-# Literally ANY chain with an RPC
-node brixa-scaler.js --rpc https://your-custom-chain:8546
-```
-
-No presets needed. Any URL works.
+No presets. No defaults. You bring the RPC, BrixaScaler adds the batching + ZK.
 
 ---
 

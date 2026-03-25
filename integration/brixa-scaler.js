@@ -39,22 +39,9 @@ const CONFIG = {
   demoMode: process.env.DEMO_MODE !== 'false'
 };
 
-// Default RPCs for common chains (user can override with --rpc)
-const DEFAULT_RPCS = {
-  ethereum: 'https://eth.llamarpc.com',
-  polygon: 'https://polygon-rpc.com',
-  bsc: 'https://bsc-dataseed.binance.org',
-  avalanche: 'https://api.avax.network/ext/bc/C/rpc',
-  arbitrum: 'https://arb1.arbitrum.io/rpc',
-  optimism: 'https://mainnet.optimism.io',
-  solana: 'https://api.mainnet-beta.solana.com',
-  bitcoin: 'http://localhost:8332',
-  base: 'https://mainnet.base.org',
-  fantom: 'https://rpc.fantom.network',
-  celo: 'https://rpc.celo.org',
-  aurora: 'https://mainnet.aurora.dev',
-  // Add any chain by passing --rpc
-};
+// Chain agnostic - user provides their own RPC URL
+// Just pass --rpc https://your-rpc-url
+// No presets needed, works with ANY blockchain
 
 const CHAIN_IDS = {
   ethereum: '0x1',
@@ -127,10 +114,9 @@ class ZKProof {
 // ============================================
 
 class BrixaScaler {
-  constructor(chain) {
+  constructor(chain, rpcUrl) {
     this.chain = chain.toLowerCase();
-    // Chain agnostic: use user-provided RPC, or try default, or fail gracefully
-    this.rpcUrl = CONFIG.rpcUrl || DEFAULT_RPCS[this.chain] || DEFAULT_RPCS.ethereum;
+    this.rpcUrl = rpcUrl;
     this.chainId = CHAIN_IDS[this.chain] || '0x1';
     
     this.zk = new ZKProof();
@@ -216,7 +202,27 @@ class BrixaScaler {
 // ============================================
 
 function createServer() {
-  const scaler = new BrixaScaler(CONFIG.chain);
+  // Require RPC
+  if (!CONFIG.rpcUrl) {
+    console.log('\n❌ ERROR: You must provide an RPC URL!\n');
+    console.log('Usage: node brixa-scaler.js --rpc <YOUR_RPC_URL>\n');
+    console.log('Examples:');
+    console.log('  node brixa-scaler.js --rpc https://eth.llamarpc.com');
+    console.log('  node brixa-scaler.js --rpc https://polygon-rpc.com');
+    console.log('  node brixa-scaler.js --rpc http://localhost:8546');
+    console.log('  node brixa-scaler.js --rpc http://localhost:8332  (bitcoind)\n');
+    process.exit(1);
+  }
+
+  console.log('\n' + '═'.repeat(60));
+  console.log('💜 BRIXASCALER - THE LEGENDARY EDITION');
+  console.log('═'.repeat(60));
+  console.log(`   📡 RPC: ${CONFIG.rpcUrl}`);
+  console.log(`   ⚡ Batch: ${CONFIG.batchSize} txs / ${CONFIG.batchInterval}ms`);
+  console.log(`   🔒 ZK: ${CONFIG.demoMode ? 'DEMO (logs only)' : 'LIVE'}`);
+  console.log('');
+
+  const scaler = new BrixaScaler(CONFIG.chain || 'custom', CONFIG.rpcUrl);
 
   console.log('\n' + '═'.repeat(60));
   console.log('💜 BRIXASCALER - THE LEGENDARY EDITION');
@@ -518,6 +524,7 @@ function createServer() {
 
 function main() {
   console.log('💜 BrixaScaler - The Legendary Edition 💜\n');
+  console.log('📡 Note: You need an RPC endpoint for your chain.\n');
   
   const args = process.argv.slice(2);
   for (let i = 0; i < args.length; i++) {
@@ -528,23 +535,22 @@ function main() {
     if (args[i] === '--batch-interval' && args[i + 1]) CONFIG.batchInterval = parseInt(args[i + 1]);
     if (args[i] === '--shards' && args[i + 1]) CONFIG.shards = parseInt(args[i + 1]);
     if (args[i] === '--help') {
-      console.log('Usage: node brixa-scaler.js [options]');
+      console.log('Usage: node brixa-scaler.js --rpc <YOUR_RPC_URL>');
       console.log('');
-      console.log('Options:');
-      console.log('  --chain <name>       Chain name (for ID lookup, optional)');
-      console.log('  --rpc <url>          ⭐ YOUR RPC URL (any chain!)');
-      console.log('  --port <n>           Port (default 8545)');
-      console.log('  --batch-size <n>    Txs per batch (default 1000)');
-      console.log('  --batch-interval <ms>  Batch interval (default 1000)');
-      console.log('  --shards <n>         Parallel shards (default 100)');
-      console.log('');
-      console.log('ANY CHAIN WORKS:');
-      console.log('  node brixa-scaler.js --rpc https://your-rpc-url');
+      console.log('⭐ You MUST provide an RPC URL for your chain.');
       console.log('');
       console.log('Examples:');
       console.log('  node brixa-scaler.js --rpc https://eth.llamarpc.com');
       console.log('  node brixa-scaler.js --rpc https://polygon-rpc.com');
-      console.log('  node brixa-scaler.js --rpc https://your-custom-chain:8546');
+      console.log('  node brixa-scaler.js --rpc http://localhost:8546  (local node)');
+      console.log('  node brixa-scaler.js --rpc http://localhost:8332  (bitcoind)');
+      console.log('');
+      console.log('Options:');
+      console.log('  --rpc <url>          ⭐ REQUIRED: Your RPC endpoint');
+      console.log('  --port <n>           Port (default 8545)');
+      console.log('  --batch-size <n>    Txs per batch (default 1000)');
+      console.log('  --batch-interval <ms>  Batch interval (default 1000)');
+      console.log('  --shards <n>         Parallel shards (default 100)');
       console.log('');
       console.log('Environment:');
       console.log('  DEMO_MODE=false      Actually send transactions');
@@ -570,4 +576,4 @@ function main() {
 
 main();
 
-module.exports = { BrixaScaler, ZKProof, CONFIG, DEFAULT_RPCS };
+module.exports = { BrixaScaler, ZKProof, CONFIG };
