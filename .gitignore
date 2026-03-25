@@ -1,9 +1,1 @@
-# ZK Keys (too large for git - download from trusted setup)
-keys/*.zkey
-keys/*.ptau
-keys/*.r1cs
-keys/*.sym
-keys/*.wasm
-keys/*.wtns
-keys/node_modules/
-keys/package*.json
+node_modules/

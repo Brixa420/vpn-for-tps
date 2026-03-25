@@ -17,6 +17,11 @@ BrixaScaler is a sharded transaction processing layer that enables blockchains t
 - [x] Go implementation (27M TPS)
 - [x] Hardware scaling benchmarks
 
+### Phase 2 — Production Ready
+- [x] REST API for tx submission (Go HTTP server)
+- [ ] Multi-node cluster deployment
+- [ ] 100M+ TPS on server hardware
+
 ### Phase 3 — Multi-Chain
 - [ ] EVM chain support
 - [ ] Solana compatibility

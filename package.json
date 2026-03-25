@@ -19,8 +19,9 @@
   ],
   "author": "Laura Wolf (Brixa420)",
   "license": "MIT",
-  "dependencies": {},
-  "devDependencies": {},
+  "dependencies": {
+    "snarkjs": "^0.7.6"
+  },
   "engines": {
     "node": ">=14.0.0"
   }
