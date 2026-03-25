@@ -1,141 +1,143 @@
-# 💜 BrixaScaler - The Legendary Edition
+# 💜 BrixaScaler + BrixaRoll
 
-> **"The VPN for TPS" - Zero-Knowledge Transaction Batching**
+> **"The VPN for TPS" - True Off-Chain Rollup**
 
-- ⚡ **1000x TPS** on any chain
-- 🔐 **ZK Privacy** - Zero-knowledge commitments
-- ⛓️ **ANY CHAIN** - Just provide your RPC
-- 🎮 **Just Works**
+Two versions for maximum chaos:
 
 ---
 
-## ⚠️ Required: RPC Endpoint
+## 🚀 BrixaRoll (Recommended - TRUE OFF-CHAIN)
 
-**You must provide your own RPC URL.** This is how BrixaScaler talks to the blockchain.
+**The chain barely knows you exist.**
+
+```bash
+node brixaroll.js --rpc https://your-rpc-url
+```
+
+### How It Works
+
+```
+WALLET ──► 1000 TXS ──► BRIXAROLL (OFF-CHAIN)
+                            │
+                            ▼
+                   [hold all txs off-chain]
+                            │
+                            ▼
+                   Generate ZK proof
+                            │
+                            ▼
+                   Submit 1 PROOF TX to chain
+                            │
+                            ▼
+              CHAIN SEES: 1 transaction
+              ACTUALLY EXECUTED: 1000 transactions
+```
+
+- Chain sees: **1 tx**
+- Real txs: **1000 tx**
+- Speed: **🚀🚀🚀 INSANE**
+
+---
+
+## ⚡ BrixaScaler (Batching)
+
+**Simpler, less efficient, still fast.**
 
 ```bash
 node brixa-scaler.js --rpc https://your-rpc-url
 ```
 
-No presets. No defaults. You bring the RPC, BrixaScaler adds the batching + ZK.
+### How It Works
+
+```
+WALLET ──► 1000 TXS ──► BRIXASCALER
+                            │
+                            ▼
+                   [batch together]
+                            │
+                            ▼
+                   Send 1 RPC call
+                            │
+                            ▼
+              CHAIN SEES: 1 call (with 1000 txs)
+```
+
+- Chain sees: **1 RPC call**
+- Still fast, simpler to run
+
+---
+
+## Quick Start
+
+```bash
+# BrixaRoll - TRUE off-chain (recommended)
+node brixaroll.js --rpc https://your-rpc-url
+
+# OR BrixaScaler - simple batching
+node brixa-scaler.js --rpc https://your-rpc-url
+```
+
+---
+
+## Which One?
+
+| Version | Chain Sees | Speed | Complexity |
+|---------|-----------|-------|------------|
+| **BrixaRoll** | 1 tx per 1000 | 🚀🚀🚀 | Medium |
+| **BrixaScaler** | 1 call per 1000 | 🚀 | Easy |
+
+**BrixaRoll = maximum chaos.** 
+
+---
+
+## Smart Contract (for BrixaRoll)
+
+Deploy `contracts/BrixaRollup.sol` to enable true off-chain:
+
+```bash
+# Compile with solc
+solc contracts/BrixaRollup.sol --combined-json abi > abi.json
+
+# Deploy (using remix, hardhat, etc.)
+# Set ROLLUP_CONTRACT env var
+export ROLLUP_CONTRACT=0xYourDeployedAddress
+```
+
+---
+
+## ⚠️ Required: RPC Endpoint
+
+You must provide your own RPC URL:
+
+```bash
+node brixaroll.js --rpc https://your-rpc-url
+```
 
 ---
 
 ## Bitcoin Setup
 
-Bitcoin is different - no public HTTP RPCs like Ethereum. You need a local node:
-
-### Option 1: Run bitcoind (Recommended)
+Bitcoin needs a local node:
 
 ```bash
-# 1. Install Bitcoin Core
-# Download from https://bitcoin.org/en/download
+# Run bitcoind
+bitcoind -server -rpcuser=user -rpcpassword=pass -rpcport=8332
 
-# 2. Run bitcoind with RPC enabled
-bitcoind -server -rpcuser=youruser -rpcpassword=yourpass -rpcport=8332
-
-# 3. Start BrixaScaler
-node brixa-scaler.js --rpc http://youruser:yourpass@localhost:8332
-```
-
-### Option 2: Use a Bitcoin API (read-only)
-
-Some APIs work for reading, but for sending transactions you need a local node.
-
----
-
-## Other Chains
-
----
-
-## What It Does
-
-```
-WALLET ─► 1,000 TXS ─► BRIXASCALER ─► ZK PROOF ─► BLOCKCHAIN
-                                    │
-                              Privacy preserved!
-                              Batch verified!
-```
-
-### The Magic
-
-1. **Queue** - Transactions come in, get ZK commitments
-2. **Batch** - 1,000 txs combined into one
-3. **ZK Proof** - Proves batch is valid without revealing details
-4. **Submit** - One call to blockchain instead of 1,000
-
-**Result: 1000x TPS + privacy on ANY chain**
-
----
-
-## ZK Privacy
-
-```
-Transaction: { to: "Alice", value: 100 }
-
-becomes:
-
-Commitment: hash(tx + secret) ──► Public
-Secret: (hidden) ──► Only you know
-
-The blockchain sees:
-- ✓ Batch is valid
-- ✓ All txs are legitimate
-- ✗ No one knows who sent what
+# Connect
+node brixaroll.js --rpc http://user:pass@localhost:8332
 ```
 
 ---
 
 ## Demo Mode
 
-**Default: DEMO_MODE=true** - Transactions are logged but NOT sent to chain.
+**Default: DEMO_MODE=true** - Logs transactions, doesn't submit to chain.
 
-This is for:
-- Testing your app
-- Development
-- Seeing how it works
-
-**For production:**
+For production:
 ```bash
 export DEMO_MODE=false
-node brixa-scaler.js --chain ethereum
+node brixaroll.js --rpc https://your-rpc-url
 ```
-
----
-
-## Options
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--chain` | ethereum | Target chain |
-| `--rpc` | auto | Custom RPC URL |
-| `--port` | 8545 | Server port |
-| `--batch-size` | 1000 | Txs per batch |
-| `--batch-interval` | 1000 | MS between batches |
-| `--shards` | 100 | Parallel shards |
-
-### Environment
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `DEMO_MODE` | true | false = actually send txs |
-| `API_KEY` | - | Require API key |
-| `RPC_URL` | auto | Override RPC |
-
----
-
-## No Presets
-
-- ❌ No token lists
-- ❌ No chain configs
-- ❌ No limitations
-
-- ✅ ANY RPC URL works
-- ✅ Any blockchain
-- ✅ Fully chain agnostic
-- ❌ No complexity
-
-- ✅ Just TPS + ZK + middleware
 
 ---
 
@@ -143,35 +145,30 @@ node brixa-scaler.js --chain ethereum
 
 ```
 integration/
-├── brixa-scaler.js    # ⭐ Main server
-├── server.js         # Basic proxy
-├── sidecar.js        # Validator sidecar
-└── test-scaler.js    # Tests
+├── brixaroll.js       # ⭐ TRUE OFF-CHAIN ROLLUP
+├── brixa-scaler.js    # Simple batching
+├── server.js          # Basic proxy
+└── sidecar.js        # Validator sidecar
+
+contracts/
+└── BrixaRollup.sol   # Smart contract for rollup
 ```
-
----
-
-**Built by Laura Wolf (Brixa420) + Elara AI 🧸💖**
 
 ---
 
 ## License
 
-**MIT License - Do whatever you want.** 
-
-Just don't sue us. We're not responsible if this breaks something, burns your house down, or causes your pet rock to run away.
+**MIT License - Do whatever you want.** Just don't sue us.
 
 ```
-MIT License
-
-Copyright (c) 2026 Laura Wolf (Brixa420) + Elara AI
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software... [full MIT text]
-
-DISCLAIMER: This software is provided "as is", without warranty of any kind.
-We are not liable for any damages, lost funds, or existential crises 
-resulting from its use.
+DISCLAIMER: This software is provided "as is", without warranty.
+We are not liable for any damages, lost funds, or pet rocks 
+running away resulting from its use.
 ```
 
-**TL;DR:** Use it, fork it, sell it, break it. Just don't come crying to us.
+**TL;DR:** Use it, fork it, break it. Just don't cry to us. 🧸💖
+
+---
+
+**Built by Laura Wolf (Brixa420) + Elara AI 🧸💖**
+**"The chain won't know what hit it."**
