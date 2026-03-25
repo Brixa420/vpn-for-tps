@@ -8,6 +8,35 @@ BrixaScaler is a sharded transaction processing layer that enables blockchains t
 
 ---
 
+## 🚀 Roadmap
+
+### Phase 1 — Core Infrastructure (Complete ✅)
+- [x] Sharded transaction processing (10+ shards)
+- [x] Merkle tree construction (parallel)
+- [x] ZK proof generation (snarkjs)
+- [x] Go implementation (27M TPS)
+- [x] Hardware scaling benchmarks
+
+### Phase 2 — Integration (In Progress)
+- [ ] Connect to Brixa blockchain validators
+- [ ] Submit proofs to main_node.py
+- [ ] Implement BLS signature aggregation
+- [ ] Add mempool sync between nodes
+
+### Phase 3 — Production Features
+- [ ] REST API for tx submission
+- [ ] WebSocket for real-time updates
+- [ ] Multi-node cluster deployment
+- [ ] Dashboard & monitoring
+
+### Phase 4 — Scale
+- [ ] 100M+ TPS on server hardware
+- [ ] GPU acceleration for ZK proofs
+- [ ] Multiple chain support (EVM, Solana, etc.)
+- [ ] White-label integration
+
+---
+
 ## 🏆 BENCHMARKS
 
 | Implementation | TPS | Target | Status |
