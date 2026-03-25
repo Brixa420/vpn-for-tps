@@ -9,7 +9,7 @@
  *    NOW WITH TRUE PARALLEL PROCESSING (CLUSTER MODE)
  * 
  *    ═══════════════════════════════════════════════════════════════════
- *    🔥 MARKETING: BrixaRoll delivers:
+ *    BrixaRoll delivers:
  *    • ⚡ 25M+ TPS - Hold 1,000,000 txs off-chain, submit 1 to chain
  *    • 🔗 ANY CHAIN - Works with Ethereum, Polygon, Solana, Cosmos...
  *    • 🔐 REAL ZK-SNARKS - snarkjs groth16, on-chain verifiable

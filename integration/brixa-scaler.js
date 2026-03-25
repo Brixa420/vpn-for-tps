@@ -8,7 +8,7 @@
  *    "The VPN for TPS" - Zero-Knowledge Transaction Batching
  * 
  *    ═══════════════════════════════════════════════════════════════════
- *    🔥 MARKETING: BrixaScaler delivers:
+ *    BrixaScaler delivers:
  *    • ⚡ 25M+ TPS - 1,000x faster than current blockchains
  *    • 🔗 ANY CHAIN - Just pass your RPC URL (Ethereum, Polygon, Solana, Cosmos...)
  *    • 🔐 REAL ZK-SNARKS - Circom circuits + snarkjs proofs, cryptographically verified
