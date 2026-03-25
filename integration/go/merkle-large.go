@@ -8,13 +8,11 @@ import (
 	"time"
 )
 
-// HashSHA256 - single hash
 func HashSHA256(data []byte) []byte {
 	h := sha256.Sum256(data)
 	return h[:]
 }
 
-// MerkleRoot - build merkle root from leaf hashes
 func MerkleRoot(hashes [][]byte) []byte {
 	if len(hashes) == 0 {
 		return HashSHA256([]byte("empty"))
@@ -42,7 +40,6 @@ func MerkleRoot(hashes [][]byte) []byte {
 	return layer[0]
 }
 
-// ProcessChunk - parallel worker function
 func ProcessChunk(start, end int, result chan []byte, wg *sync.WaitGroup) {
 	defer wg.Done()
 	
@@ -59,14 +56,11 @@ func ProcessChunk(start, end int, result chan []byte, wg *sync.WaitGroup) {
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	
-	sizes := []int{1000000, 5000000, 10000000, 20000000, 50000000}
+	sizes := []int{10000000, 20000000, 50000000}
 	numWorkers := runtime.NumCPU()
 	
-	fmt.Printf("╔══════════════════════════════════════════════════════════════╗\n")
-	fmt.Printf("║           GO PARALLEL MERKLE PROVER (Multi-core)             ║\n")
-	fmt.Printf("╚══════════════════════════════════════════════════════════════╝\n\n")
-	
-	fmt.Printf("CPUs: %d\n\n", numWorkers)
+	fmt.Printf("CPUs: %d
+", numWorkers)
 	
 	fmt.Println("| Size       | Time     | TPS        |")
 	fmt.Println("|------------|----------|------------|")
@@ -99,19 +93,17 @@ func main() {
 		wg.Wait()
 		close(result)
 		
-		// Combine roots
 		var roots [][]byte
 		for r := range result {
 			roots = append(roots, r)
 		}
 		
-		_ = MerkleRoot(roots) // Combine into final root
+		_ = MerkleRoot(roots)
 		elapsed := time.Since(start)
 		
 		tps := float64(size) / elapsed.Seconds()
 		
-		fmt.Printf("| %d | %7s | %10.0f |\n", size, elapsed.Round(time.Millisecond), tps)
+		fmt.Printf("| %d | %7s | %10.0f |
+", size, elapsed.Round(time.Millisecond), tps)
 	}
-	
-	fmt.Println("\n✓ Go multi-core prover ready! 10M+ TPS achievable\n")
 }
