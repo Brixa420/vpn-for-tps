@@ -30,16 +30,17 @@ const { URL } = require('url');
 
 const CONFIG = {
   chain: process.env.CHAIN || 'ethereum',
-  rpcUrl: process.env.RPC_URL || null,
+  rpcUrl: process.env.RPC_URL || null,  // User provides their own RPC
   port: parseInt(process.env.PORT) || 8545,
   batchSize: parseInt(process.env.BATCH_SIZE) || 1000,
   batchInterval: parseInt(process.env.BATCH_INTERVAL) || 1000,
   shards: parseInt(process.env.SHARDS) || 100,
   apiKey: process.env.API_KEY || '',
-  demoMode: process.env.DEMO_MODE !== 'false' // Default: true = don't actually send
+  demoMode: process.env.DEMO_MODE !== 'false'
 };
 
-const CHAINS = {
+// Default RPCs for common chains (user can override with --rpc)
+const DEFAULT_RPCS = {
   ethereum: 'https://eth.llamarpc.com',
   polygon: 'https://polygon-rpc.com',
   bsc: 'https://bsc-dataseed.binance.org',
@@ -47,7 +48,12 @@ const CHAINS = {
   arbitrum: 'https://arb1.arbitrum.io/rpc',
   optimism: 'https://mainnet.optimism.io',
   solana: 'https://api.mainnet-beta.solana.com',
-  bitcoin: 'http://localhost:8332'
+  bitcoin: 'http://localhost:8332',
+  base: 'https://mainnet.base.org',
+  fantom: 'https://rpc.fantom.network',
+  celo: 'https://rpc.celo.org',
+  aurora: 'https://mainnet.aurora.dev',
+  // Add any chain by passing --rpc
 };
 
 const CHAIN_IDS = {
@@ -58,7 +64,12 @@ const CHAIN_IDS = {
   arbitrum: '0xa4b1',
   optimism: '0xa',
   solana: '0x1',
-  bitcoin: '0x1'
+  bitcoin: '0x1',
+  base: '0x2105',
+  fantom: '0xfa',
+  celo: '0xa4ec',
+  aurora: '0x4e454152'
+  // Unknown chains get '0x1' as default
 };
 
 // ============================================
@@ -118,7 +129,8 @@ class ZKProof {
 class BrixaScaler {
   constructor(chain) {
     this.chain = chain.toLowerCase();
-    this.rpcUrl = CONFIG.rpcUrl || CHAINS[this.chain] || CHAINS.ethereum;
+    // Chain agnostic: use user-provided RPC, or try default, or fail gracefully
+    this.rpcUrl = CONFIG.rpcUrl || DEFAULT_RPCS[this.chain] || DEFAULT_RPCS.ethereum;
     this.chainId = CHAIN_IDS[this.chain] || '0x1';
     
     this.zk = new ZKProof();
@@ -519,16 +531,25 @@ function main() {
       console.log('Usage: node brixa-scaler.js [options]');
       console.log('');
       console.log('Options:');
-      console.log('  --chain <name>       ethereum, polygon, bsc, avalanche, arbitrum, optimism, solana');
-      console.log('  --rpc <url>          Custom RPC URL');
+      console.log('  --chain <name>       Chain name (for ID lookup, optional)');
+      console.log('  --rpc <url>          ⭐ YOUR RPC URL (any chain!)');
       console.log('  --port <n>           Port (default 8545)');
       console.log('  --batch-size <n>    Txs per batch (default 1000)');
       console.log('  --batch-interval <ms>  Batch interval (default 1000)');
       console.log('  --shards <n>         Parallel shards (default 100)');
       console.log('');
+      console.log('ANY CHAIN WORKS:');
+      console.log('  node brixa-scaler.js --rpc https://your-rpc-url');
+      console.log('');
+      console.log('Examples:');
+      console.log('  node brixa-scaler.js --rpc https://eth.llamarpc.com');
+      console.log('  node brixa-scaler.js --rpc https://polygon-rpc.com');
+      console.log('  node brixa-scaler.js --rpc https://your-custom-chain:8546');
+      console.log('');
       console.log('Environment:');
-      console.log('  DEMO_MODE=false      Actually send transactions (for production)');
+      console.log('  DEMO_MODE=false      Actually send transactions');
       console.log('  API_KEY=<key>        Require API key');
+      console.log('  RPC_URL=<url>        Your RPC URL');
       console.log('');
       process.exit(0);
     }
@@ -549,4 +570,4 @@ function main() {
 
 main();
 
-module.exports = { BrixaScaler, ZKProof, CONFIG, CHAINS };
+module.exports = { BrixaScaler, ZKProof, CONFIG, DEFAULT_RPCS };

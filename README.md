@@ -4,7 +4,7 @@
 
 - ⚡ **1000x TPS** on any chain
 - 🔐 **ZK Privacy** - Zero-knowledge commitments
-- ⛓️ **Any Chain** - ETH, Polygon, BSC, Avalanche, Arbitrum, Optimism, Solana
+- ⛓️ **ANY CHAIN** - Just pass your RPC URL
 - 🎮 **Just Works** - Zero config
 
 ---
@@ -12,13 +12,34 @@
 ## Quick Start
 
 ```bash
-# Run (demo mode - logs, doesn't send)
-node brixa-scaler.js --chain ethereum
+# Run with ANY RPC (chain agnostic!)
+node brixa-scaler.js --rpc https://your-rpc-url
 
-# Point wallet to http://localhost:8545
+# Or with a preset chain
+node brixa-scaler.js --rpc https://eth.llamarpc.com
 ```
 
-That's it. Open the dashboard at http://localhost:8545
+---
+
+## Chain Agnostic
+
+**Works with ANY blockchain.** Just pass your RPC URL:
+
+```bash
+# Any EVM chain
+node brixa-scaler.js --rpc https://your-evm-rpc:8546
+
+# Solana
+node brixa-scaler.js --rpc https://api.mainnet-beta.solana.com
+
+# Bitcoin
+node brixa-scaler.js --rpc http://localhost:8332
+
+# Literally ANY chain with an RPC
+node brixa-scaler.js --rpc https://your-custom-chain:8546
+```
+
+No presets needed. Any URL works.
 
 ---
 
@@ -98,23 +119,15 @@ node brixa-scaler.js --chain ethereum
 
 ---
 
-## Supported Chains
+## No Presets
 
-- ethereum
-- polygon  
-- bsc
-- avalanche
-- arbitrum
-- optimism
-- solana
+- ❌ No token lists
+- ❌ No chain configs
+- ❌ No limitations
 
----
-
-## No Junk
-
-- ❌ No tokens
-- ❌ No blockchain
-- ❌ No node rewards
+- ✅ ANY RPC URL works
+- ✅ Any blockchain
+- ✅ Fully chain agnostic
 - ❌ No complexity
 
 - ✅ Just TPS + ZK + middleware
