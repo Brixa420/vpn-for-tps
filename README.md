@@ -125,3 +125,26 @@ integration/
 ---
 
 **Built by Laura Wolf (Brixa420) + Elara AI 🧸💖**
+
+---
+
+## License
+
+**MIT License - Do whatever you want.** 
+
+Just don't sue us. We're not responsible if this breaks something, burns your house down, or causes your pet rock to run away.
+
+```
+MIT License
+
+Copyright (c) 2026 Laura Wolf (Brixa420) + Elara AI
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software... [full MIT text]
+
+DISCLAIMER: This software is provided "as is", without warranty of any kind.
+We are not liable for any damages, lost funds, or existential crises 
+resulting from its use.
+```
+
+**TL;DR:** Use it, fork it, sell it, break it. Just don't come crying to us.
