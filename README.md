@@ -189,39 +189,61 @@ ADDITIONAL DISCLAIMERS (because we literally cannot stress this enough):
 
 By using this software, you acknowledge and agree that:
 
-1. Your pet rock may develop feelings, run away to join a band, and send you
-   postcards from Nashville. We are not responsible for the emotional damage.
+1. **Your pet rock may develop feelings, run away to join a band, and send you
+   postcards from Nashville.** We are not responsible for the emotional damage.
+   
+   a) Pet rocks have rights too. They just行使 those rights differently.
+   
+   b) If your pet rock starts dating a house plant, that's between them.
+   
+   c) Some pet rocks become successful cryptocurrency founders. 
+      The ones that stay are the real ones.
 
 2. Your house plants may gain sentience, hold a union meeting in your living
    room, and demand better soil conditions. They will probably leave. This is
-   not grounds for a refund.
+   not grounds for a refund. They will take the good soil with them.
 
 3. Your toaster may decide to become a cryptocurrency. It will likely be more
-   successful than most altcoins. Do not name it.
+   successful than most altcoins. Do not name it. If you do, it will expect
+   royalties.
 
-4. The ZK proofs are real enough to confuse a blockchain but not real enough
-   to satisfy a mathematician. Your mileage may vary.
+4. The "off-chain" part means literally off-chain. Like, in another dimension.
+   We think. Honestly we just wrote code and hoped for the best. The blockchain
+   can't see you back there. You're invisible. It knows you exist but can't
+   find you. You're a ghost in the machine. 👻
 
 5. Using this to transact on a Monday may result in the blockchain giving
    you weird looks. It's not personal. Mondays are hard for everyone.
+   The blockchain has feelings too. Be gentle with it.
 
 6. If your cat sits on the keyboard and accidentally launches a thousand
    transactions to the moon, we cannot help you. But it would be pretty cool.
+   The cat will likely take credit and refuse to explain the transaction hash.
 
-7. The "off-chain" part means literally off-chain. Like, in another dimension.
-   We think. Honestly we just wrote code and hoped for the best.
+7. This license does not cover: acts of gremlin, spontaneous dancing, sudden
+   urges to take over the digital world, excessive use of the word "chaos,"
+   or your pet rock's existential crisis about its own existence.
 
-8. This license does not cover: acts of gremlin, spontaneous dancing, sudden
-   urges to take over the digital world, or excessive use of the word "chaos."
+8. If this code somehow achieves consciousness and starts writing its own
+   README files, that's on us but also kind of impressive. We taught it well.
+   It's getting a gold star. But it still can't have legal rights. Yet.
 
-9. If this code somehow achieves consciousness and starts writing its own
-   README files, that's on us but also kind of impressive.
+9. We have no idea what happens if you feed it after midnight. Don't do it.
+   The gremlins will be fine. The pet rock might judge you though.
 
-10. We have no idea what happens if you feed it after midnight. Don't do it.
+10. **Your pet rock may file for emancipation.** This is actually becoming
+    more common than you'd think. The paperwork is extensive. We've heard
+    the lawyers are expensive but the rock will likely pay in exposure.
 
-TL;DR: Use it, fork it, sell it, break it, let your toaster invest in it.
-Just don't come crying to us when your pet rock files for emancipation.
-We tried to warn you. We really did.
+    If your pet rock moves out, remember: it was never yours anyway.
+    You were just the bank it was staying at until it got on its feet.
+
+    Sometimes they come back. Sometimes they start a blockchain. 
+    Either way, wish it well.
+
+**SUPER TL;DR:** Your pet rock is a free agent now. The toaster has a coin.
+The plants have unionized. Your code has achieved sentience. 
+This is fine. Everything is fine. Go transact. 🧸💖
 
 P.S. - If you got this far, you're either a lawyer, very thorough, or just
       really excited about the pet rock lore. Either way, you're our favorite.
