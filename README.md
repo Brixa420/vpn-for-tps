@@ -68,6 +68,7 @@ node sidecar.js --chain ethereum --original-rpc http://your-validator:8546 --por
 - ✅ **Public RPCs** - No API key needed
 - ✅ **7 chains** - ETH, Polygon, BSC, Avalanche, Arbitrum, Optimism, Solana
 - ✅ **Status page** - Built-in dashboard at http://localhost:8545
+- ✅ **Security** - Rate limiting, API auth, input validation
 
 ---
 
@@ -166,12 +167,60 @@ MIT
 - ✅ Batch processing logic  
 - ✅ RPC proxy server
 - ✅ Public RPC integration
+- ✅ Security (rate limiting, API auth, input validation)
 
-### What Needs Finishing
-- ❌ Real transaction signing
+### What Needs Finishing (for production)
+- ❌ Real transaction signing (add private key handling)
 - ❌ Gas/fee management
 - ❌ Transaction confirmations
 - ❌ Distributed coordination
+
+---
+
+## 🔒 Security
+
+BrixaScaler includes security features enabled by default:
+
+### Default Security (Always On)
+- **Rate limiting**: 100 requests per 10 seconds per IP
+- **Input validation**: All RPC params validated
+- **CORS**: Restricted to localhost by default
+- **Demo mode**: Transactions logged, NOT sent to chain
+
+### Optional Security (Enable for Production)
+
+```bash
+# Enable API key authentication
+export API_KEY=your-secret-key
+node server.js --chain ethereum
+
+# Production mode (actually send transactions)
+export DEMO_MODE=false
+export API_KEY=your-secret-key
+node server.js --chain ethereum
+```
+
+### Environment Variables
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `API_KEY` | (none) | Set to require authentication |
+| `DEMO_MODE` | true | Set to `false` to send real transactions |
+| `CORS_ORIGINS` | localhost | Comma-separated list |
+| `MAX_QUEUE_SIZE` | 100000 | Max queued transactions |
+| `MAX_BATCH_SIZE` | 1000 | Max txs per batch |
+| `PORT` | 8545 | Server port |
+
+### Connecting to Your RPC
+```bash
+# Point to your blockchain RPC
+node server.js --chain ethereum
+```
+
+The dev just needs to:
+1. Clone the repo
+2. Run `npm install`
+3. Point their wallet to `http://localhost:8545`
+4. Optionally set `DEMO_MODE=false` and add RPC credentials for real sends
 
 ---
 

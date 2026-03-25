@@ -1,24 +1,50 @@
 /**
  * BrixaScaler RPC Proxy Server
- * Run as middleware - NO API KEY NEEDED!
+ * Run as middleware - NO API KEY NEEDED by default!
+ * 
+ * SECURITY FEATURES (enabled by default):
+ * - Rate limiting: 100 requests per 10 seconds per IP
+ * - API key authentication (set API_KEY env var to enable)
+ * - Input validation on all RPC calls
+ * - CORS restricted to localhost by default
+ * - Demo mode (transactions logged, NOT sent)
  * 
  * Usage:
  *   node server.js --chain ethereum --port 8545
+ * 
+ * Secure production mode:
+ *   API_KEY=mysecretkey node server.js --chain ethereum --demo false
  * 
  * That's it! Uses public RPCs automatically.
  */
 
 const http = require('http');
-const { BrixaScaler, PUBLIC_RPCS, getPublicRPC } = require('./brixa-scaler');
+const { 
+  BrixaScaler, 
+  PUBLIC_RPCS, 
+  getPublicRPC,
+  SECURITY,
+  checkRateLimit,
+  validateRPCInput,
+  validateApiKey
+} = require('./brixa-scaler');
+
+// Get client IP from request
+function getClientIP(req) {
+  return req.headers['x-forwarded-for']?.split(',')[0]?.trim() || 
+         req.headers['x-real-ip'] || 
+         req.socket.remoteAddress || 
+         'unknown';
+}
 
 // Parse args
 const args = process.argv.slice(2);
 const config = {
   chain: 'ethereum',  // Default, can override with --chain
-  port: 8545,
+  port: parseInt(process.env.PORT) || 8545,
   shards: 100,
   batchSize: 1000,
-  demo: false
+  demo: process.env.DEMO_MODE !== 'false'
 };
 
 for (let i = 0; i < args.length; i += 2) {
@@ -28,16 +54,19 @@ for (let i = 0; i < args.length; i += 2) {
   if (key === 'port') config.port = parseInt(value);
   if (key === 'shards') config.shards = parseInt(value);
   if (key === 'batch-size') config.batchSize = parseInt(value);
-  if (key === 'demo') config.demo = true;
+  if (key === 'demo') config.demo = value !== 'false';
 }
 
 async function main() {
   console.log('\n' + '═'.repeat(50));
-  console.log('💜 BrixaScaler - VPN for TPS');
+  console.log('💜 BrixaScaler - VPN for TPS (SECURE)');
   console.log('═'.repeat(50));
   console.log(`   Chain: ${config.chain}`);
   console.log(`   Port: ${config.port}`);
-  console.log(`   Shards: ${config.shards}\n`);
+  console.log(`   Shards: ${config.shards}`);
+  console.log(`   Demo Mode: ${config.demo ? 'ON' : 'OFF'}`);
+  console.log(`   API Key: ${SECURITY.apiKey ? 'Required' : 'Not required'}`);
+  console.log(`   Rate Limit: ${SECURITY.rateLimit.maxRequests}/${SECURITY.rateLimit.windowMs/1000}s\n`);
 
   // Create scaler
   const scaler = new BrixaScaler(config.chain, {
@@ -55,11 +84,61 @@ async function main() {
   chains.forEach(c => console.log(`   - ${c}`));
   console.log('');
 
-  // Create proxy server
+  // Create proxy server with security middleware
   const server = http.createServer(async (req, res) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    const clientIP = getClientIP(req);
+    
+    // Security: Rate limiting
+    if (!checkRateLimit(clientIP)) {
+      console.log(`🚫 Rate limit exceeded for ${clientIP}`);
+      res.writeHead(429, { 
+        'Content-Type': 'application/json',
+        'Retry-After': '10'
+      });
+      res.end(JSON.stringify({ 
+        jsonrpc: '2.0', 
+        id: 1, 
+        error: { 
+          code: -32005, 
+          message: 'Rate limit exceeded. Try again later.' 
+        } 
+      }));
+      return;
+    }
+
+    // Security: API Key check
+    if (!validateApiKey(req)) {
+      console.log(`🚫 Invalid API key from ${clientIP}`);
+      res.writeHead(401, { 
+        'Content-Type': 'application/json',
+        'WWW-Authenticate': 'Bearer realm="brixa-scaler"'
+      });
+      res.end(JSON.stringify({ 
+        jsonrpc: '2.0', 
+        id: 1, 
+        error: { 
+          code: -32001, 
+          message: 'Unauthorized. Provide valid API key.' 
+        } 
+      }));
+      return;
+    }
+
+    // Security: CORS
+    const origin = req.headers.origin;
+    const allowedOrigin = SECURITY.corsAllowedOrigins.find(o => 
+      o === '*' || 
+      origin?.match(o.replace('*', '.*')) ||
+      origin === o
+    );
+    
+    if (allowedOrigin) {
+      res.setHeader('Access-Control-Allow-Origin', origin || '*');
+    } else {
+      res.setHeader('Access-Control-Allow-Origin', 'null');
+    }
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-API-Key');
 
     if (req.method === 'OPTIONS') {
       res.writeHead(200);
@@ -68,54 +147,8 @@ async function main() {
     }
 
     if (req.method !== 'POST') {
-      // Show status page
-      const stats = scaler.getStats();
-      res.writeHead(200, { 'Content-Type': 'text/html' });
-      res.end(`
-<!DOCTYPE html>
-<html>
-<head>
-  <title>BrixaScaler - ${config.chain}</title>
-  <style>
-    body { font-family: system-ui; max-width: 600px; margin: 50px auto; padding: 20px; background: #1a1a2e; color: #fff; }
-    h1 { color: #e94560; }
-    .stats { background: #222; padding: 20px; border-radius: 10px; }
-    .stat { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #333; }
-    .label { color: #888; }
-    code { background: #333; padding: 5px 10px; border-radius: 5px; }
-    .chains { margin-top: 20px; }
-  </style>
-</head>
-<body>
-  <h1>💜 BrixaScaler</h1>
-  <p><strong>VPN for TPS</strong> - Running on ${config.chain}</p>
-  
-  <div class="stats">
-    <div class="stat"><span class="label">Chain</span><span>${stats.chain}</span></div>
-    <div class="stat"><span class="label">Shards</span><span>${stats.shards}</span></div>
-    <div class="stat"><span class="label">Queued</span><span>${stats.queued}</span></div>
-    <div class="stat"><span class="label">Status</span><span>${stats.running ? '✅ Running' : '❌ Stopped'}</span></div>
-  </div>
-  
-  <h3>Your Wallet RPC:</h3>
-  <code>http://localhost:${config.port}</code>
-  
-  <div class="chains">
-    <h3>Available:</h3>
-    <code>ethereum</code> <code>polygon</code> <code>bsc</code> <code>avalanche</code>
-    <code>arbitrum</code> <code>optimism</code> <code>solana</code>
-  </div>
-  
-  <p><small>No API key needed! Using free public RPCs.</small></p>
-  
-  <div style="background: #ff9800; color: #000; padding: 15px; border-radius: 10px; margin-top: 20px; text-align: center;">
-    <strong>⚠️ DEMO MODE</strong><br>
-    Transactions are queued but NOT sent to chain.<br>
-    To send real transactions, add your private key.
-  </div>
-</body>
-</html>
-      `);
+      res.writeHead(405, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Method not allowed' }));
       return;
     }
 
@@ -123,15 +156,59 @@ async function main() {
     req.on('data', chunk => body += chunk);
     req.on('end', async () => {
       try {
-        const rpc = JSON.parse(body);
+        // Security: Validate input
+        let rpc;
+        try {
+          rpc = JSON.parse(body);
+        } catch (e) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ 
+            jsonrpc: '2.0', 
+            id: 1, 
+            error: { 
+              code: -32600, 
+              message: 'Invalid JSON' 
+            } 
+          }));
+          return;
+        }
+        
+        const validation = validateRPCInput(rpc);
+        if (!validation.valid) {
+          console.log(`🚫 Invalid RPC from ${clientIP}: ${validation.errors.join(', ')}`);
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ 
+            jsonrpc: '2.0', 
+            id: 1, 
+            error: { 
+              code: -32602, 
+              message: 'Invalid params: ' + validation.errors.join(', ') 
+            } 
+          }));
+          return;
+        }
+
         const { jsonrpc, method, params, id } = rpc;
 
-        console.log(`📨 ${method}`);
+        console.log(`📨 ${method} from ${clientIP}`);
 
         // Handle transactions
         if (method === 'eth_sendTransaction' || method === 'eth_sendRawTransaction') {
           const tx = params[0] || {};
           const txId = scaler.submit(tx);
+
+          if (txId === null) {
+            res.writeHead(503, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ 
+              jsonrpc: '2.0', 
+              id, 
+              error: { 
+                code: -32099, 
+                message: 'Service unavailable - queue full' 
+              } 
+            }));
+            return;
+          }
 
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ jsonrpc: '2.0', id, result: txId }));
@@ -159,6 +236,7 @@ async function main() {
         }
 
       } catch (error) {
+        console.error(`   ❌ Error: ${error.message}`);
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ jsonrpc: '2.0', id: 1, error: { code: -32603, message: error.message } }));
       }
@@ -166,10 +244,17 @@ async function main() {
   });
 
   server.listen(config.port, () => {
-    console.log('✅ Server running!');
-    console.log(`   Point wallet to: http://localhost:${config.port}\n`);
+    console.log('✅ Server running securely!');
+    console.log(`   Point wallet to: http://localhost:${config.port}`);
+    console.log(`   Security: Rate limiting + Input validation enabled`);
+    if (SECURITY.apiKey) {
+      console.log(`   Auth: API key required (header: X-API-Key)`);
+    }
+    console.log('');
     console.log('💜 BrixaScaler - VPN for TPS\n');
-    console.log('⚠️  DEMO MODE - Transactions are queued but NOT sent to chain\n');
+    console.log(config.demo 
+      ? '⚠️  DEMO MODE - Transactions are queued but NOT sent to chain\n'
+      : '🔴 PRODUCTION MODE - Transactions will be sent to chain!\n');
   });
 
   // Stats
