@@ -1,21 +1,20 @@
 /**
- * BrixaScaler Sidecar - Run alongside existing validator
+ * BrixaScaler Sidecar - Run alongside any validator
  * 
  * Usage:
- *   node sidecar.js --chain ethereum --port 8545
- * 
- * That's it! Uses public RPC as default. To enhance your own validator:
- *   node sidecar.js --chain ethereum --original-rpc http://your-validator:8546 --port 8545
+ *   node sidecar.js                        # Auto-detect chain
+ *   node sidecar.js --chain ethereum      # Specify chain
+ *   node sidecar.js --original-rpc http://your-validator:8546  # Your validator
  */
 
 const http = require('http');
-const { BrixaScaler, PUBLIC_RPCS } = require('./brixa-scaler');
+const { BrixaScaler, PUBLIC_RPCS, getPublicRPC } = require('./brixa-scaler');
 
 // Parse args
 const args = process.argv.slice(2);
 const config = {
-  chain: 'ethereum',
-  originalRpc: null,  // Will default to public RPC
+  chain: null,  // Auto-detect
+  originalRpc: null,
   port: 8545,
   shards: 100,
   batchSize: 1000
@@ -26,32 +25,88 @@ for (let i = 0; i < args.length; i += 2) {
   const value = args[i + 1];
   if (key === 'chain') config.chain = value;
   if (key === 'original-rpc') config.originalRpc = value;
+  if (key === 'rpc') config.originalRpc = value;
   if (key === 'port') config.port = parseInt(value);
   if (key === 'shards') config.shards = parseInt(value);
   if (key === 'batch-size') config.batchSize = parseInt(value);
 }
 
+async function detectChain(rpcUrl) {
+  // Try to detect chain ID
+  const chainIds = {
+    '0x1': 'ethereum',
+    '0x89': 'polygon',
+    '0x38': 'bsc',
+    '0xa86a': 'avalanche',
+    '0xa4b1': 'arbitrum',
+    '0xa': 'optimism',
+  };
+  
+  try {
+    const chainId = await makeRPCRequest(rpcUrl, 'eth_chainId', []);
+    if (chainId && chainIds[chainId]) {
+      return chainIds[chainId];
+    }
+    
+    // Try Solana
+    const slot = await makeRPCRequest(rpcUrl, 'getSlot', []);
+    if (slot !== null) return 'solana';
+  } catch (e) {
+    // Try Bitcoin
+    try {
+      const info = await makeRPCRequest(rpcUrl, 'getblockchaininfo', []);
+      if (info) return 'bitcoin';
+    } catch (e2) {}
+  }
+  
+  return 'ethereum'; // Default
+}
+
 async function main() {
   console.log('\n' + '═'.repeat(50));
-  console.log('💜 BrixaScaler Sidecar - Validator Enhancement');
+  console.log('💜 BrixaScaler Sidecar - Chain-Agnostic');
   console.log('═'.repeat(50));
-  console.log(`   Chain: ${config.chain}`);
   console.log(`   Listen on: ${config.port}`);
   console.log('');
 
-  // Default to public RPC if no original provided
-  if (!config.originalRpc) {
-    const publicRpcs = PUBLIC_RPCS[config.chain.toLowerCase()];
-    if (publicRpcs && publicRpcs[0]) {
-      config.originalRpc = publicRpcs[0];
-      console.log(`   Using public RPC: ${config.originalRpc}\n`);
-    } else {
-      console.log('⚠️  No public RPC found for this chain');
-      console.log('   Use --original-rpc to specify your validator\n');
+  // Determine RPC
+  let rpcUrl = config.originalRpc;
+  
+  if (!rpcUrl) {
+    // Try common local endpoints
+    const localRpcs = [
+      'http://localhost:8545',
+      'http://localhost:8546', 
+      'http://localhost:8332',
+      'http://localhost:26657', // Cosmos
+    ];
+    
+    for (const local of localRpcs) {
+      try {
+        console.log(`   Trying: ${local}...`);
+        const detected = await detectChain(local);
+        if (detected) {
+          rpcUrl = local;
+          config.chain = detected;
+          break;
+        }
+      } catch (e) {}
     }
-  } else {
-    console.log(`   Original RPC: ${config.originalRpc}`);
+    
+    // If no local found, use public RPC
+    if (!rpcUrl) {
+      console.log('   No local chain detected, using public RPC...\n');
+      config.chain = 'ethereum';
+      rpcUrl = PUBLIC_RPCS.ethereum[0];
+    }
   }
+  
+  if (!config.chain) {
+    config.chain = await detectChain(rpcUrl);
+  }
+  
+  console.log(`   Chain detected: ${config.chain}`);
+  console.log(`   RPC: ${rpcUrl}\n`);
 
   // Create scaler
   const scaler = new BrixaScaler(config.chain, {
@@ -115,9 +170,11 @@ async function main() {
 
   server.listen(config.port, () => {
     console.log('✅ Sidecar running!');
-    console.log(`   Validator enhanced at: http://localhost:${config.port}\n`);
-    console.log(`   Original RPC: ${config.originalRpc}`);
+    console.log(`   Chain: ${config.chain} (auto-detected)`);
+    console.log(`   Listen: http://localhost:${config.port}`);
+    console.log(`   RPC: ${rpcUrl}`);
     console.log(`   Batching: ${config.batchSize} txs per batch\n`);
+    console.log('⚠️  DEMO MODE - Transactions queued but not sent to chain\n');
   });
 
   // Stats
@@ -165,3 +222,40 @@ function passThrough(rpcUrl, method, params) {
 }
 
 main().catch(console.error);
+
+// ============ Helper Functions ============
+
+function makeRPCRequest(rpcUrl, method, params) {
+  return new Promise((resolve, reject) => {
+    const body = JSON.stringify({
+      jsonrpc: '2.0',
+      method,
+      params,
+      id: 1
+    });
+
+    const url = new URL(rpcUrl);
+    const lib = url.protocol === 'https:' ? require('https') : require('http');
+
+    const req = lib.request({
+      hostname: url.hostname,
+      port: url.port || (url.protocol === 'https:' ? 443 : 80),
+      path: url.pathname,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+    }, (res) => {
+      let data = '';
+      res.on('data', c => data += c);
+      res.on('end', () => {
+        try {
+          const p = JSON.parse(data);
+          resolve(p.result);
+        } catch (e) { reject(e); }
+      });
+    });
+
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+}

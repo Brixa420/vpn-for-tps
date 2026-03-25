@@ -14,7 +14,7 @@ const { BrixaScaler, PUBLIC_RPCS, getPublicRPC } = require('./brixa-scaler');
 // Parse args
 const args = process.argv.slice(2);
 const config = {
-  chain: 'ethereum',
+  chain: 'ethereum',  // Default, can override with --chain
   port: 8545,
   shards: 100,
   batchSize: 1000,
