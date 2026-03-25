@@ -1,527 +1,307 @@
+#!/usr/bin/env node
+
 /**
- * BrixaScaler - VPN for TPS
- * Real implementation with public RPC endpoints for easy testing
+ * BrixaScaler - Simple Transaction Batching
  * 
- * SECURITY FEATURES:
- * - Rate limiting (100 requests/10sec per IP)
- * - API key authentication (optional, via API_KEY env)
- * - Input validation on all RPC params
- * - CORS restricted to localhost by default
- * - Demo mode by default (no real txs sent)
+ * A simple RPC proxy that batches transactions and submits them to any blockchain.
+ * No ZK. No tokens. No blockchain. Just works.
+ * 
+ * Usage: node brixa-scaler.js --chain ethereum
  */
 
-const https = require('https');
 const http = require('http');
+const https = require('https');
+const { URL } = require('url');
 
 // ============================================
-// SECURITY CONFIG
+// CONFIG
 // ============================================
-const SECURITY = {
-  // API Key (set via API_KEY env var) - leave empty for open mode
-  apiKey: process.env.API_KEY || '',
-  
-  // CORS - restrict to localhost in production
-  corsAllowedOrigins: process.env.CORS_ORIGINS 
-    ? process.env.CORS_ORIGINS.split(',')
-    : ['http://localhost:*', 'http://127.0.0.1:*'],
-  
-  // Rate limiting (requests per window)
-  rateLimit: {
-    windowMs: 10000,  // 10 seconds
-    maxRequests: 100  // 100 requests per window per IP
-  },
-  
-  // Demo mode (transactions NOT sent to chain)
-  demoMode: process.env.DEMO_MODE !== 'false',
-  
-  // Max transaction queue size
-  maxQueueSize: parseInt(process.env.MAX_QUEUE_SIZE) || 100000,
-  
-  // Max batch size
-  maxBatchSize: parseInt(process.env.MAX_BATCH_SIZE) || 1000
+
+const CONFIG = {
+  chain: process.env.CHAIN || 'ethereum',
+  rpcUrl: process.env.RPC_URL || null,
+  port: parseInt(process.env.PORT) || 8545,
+  batchSize: parseInt(process.env.BATCH_SIZE) || 100,
+  batchInterval: parseInt(process.env.BATCH_INTERVAL) || 1000,
+  apiKey: process.env.API_KEY || ''
 };
 
-// In-memory rate limiting
-const rateLimitMap = new Map();
-
-/**
- * Check rate limit for IP
- */
-function checkRateLimit(ip) {
-  const now = Date.now();
-  const windowStart = now - SECURITY.rateLimit.windowMs;
-  
-  if (!rateLimitMap.has(ip)) {
-    rateLimitMap.set(ip, []);
-  }
-  
-  const requests = rateLimitMap.get(ip).filter(t => t > windowStart);
-  requests.push(now);
-  rateLimitMap.set(ip, requests);
-  
-  return requests.length <= SECURITY.rateLimit.maxRequests;
-}
-
-/**
- * Clean old rate limit entries (call periodically)
- */
-function cleanRateLimits() {
-  const now = Date.now();
-  const windowStart = now - SECURITY.rateLimit.windowMs;
-  
-  for (const [ip, requests] of rateLimitMap.entries()) {
-    const filtered = requests.filter(t => t > windowStart);
-    if (filtered.length === 0) {
-      rateLimitMap.delete(ip);
-    } else {
-      rateLimitMap.set(ip, filtered);
-    }
-  }
-}
-
-// Clean every 5 minutes
-setInterval(cleanRateLimits, 5 * 60 * 1000);
-
-/**
- * Validate and sanitize RPC input
- */
-function validateRPCInput(rpc) {
-  const errors = [];
-  
-  // Must be object
-  if (!rpc || typeof rpc !== 'object') {
-    return { valid: false, error: 'Invalid RPC request' };
-  }
-  
-  // Check JSON-RPC version
-  if (rpc.jsonrpc !== '2.0') {
-    errors.push('Invalid jsonrpc version');
-  }
-  
-  // Check method
-  if (!rpc.method || typeof rpc.method !== 'string') {
-    errors.push('Missing or invalid method');
-  }
-  
-  // Validate method name ( alphanumeric + underscore)
-  if (rpc.method && !/^[a-zA-Z0-9_]+$/.test(rpc.method)) {
-    errors.push('Invalid method name');
-  }
-  
-  // Check params
-  if (rpc.params !== undefined && !Array.isArray(rpc.params) && typeof rpc.params !== 'object') {
-    errors.push('Invalid params type');
-  }
-  
-  // Validate address in params (if present)
-  if (rpc.params && Array.isArray(rpc.params)) {
-    for (const param of rpc.params) {
-      if (param && typeof param === 'object') {
-        // Check 'to' address format
-        if (param.to && typeof param.to === 'string') {
-          if (!param.to.match(/^0x[a-fA-F0-9]{40}$/) && !param.to.match(/^[a-zA-Z0-9]{32,44}$/)) {
-            // Allow contracts but flag suspicious
-            console.warn(`⚠️  Suspicious address format: ${param.to}`);
-          }
-        }
-        
-        // Check 'from' address format
-        if (param.from && typeof param.from === 'string') {
-          if (!param.from.match(/^0x[a-fA-F0-9]{40}$/) && !param.from.match(/^[a-zA-Z0-9]{32,44}$/)) {
-            console.warn(`⚠️  Suspicious from address: ${param.from}`);
-          }
-        }
-        
-        // Check value (should be hex or number, not massive)
-        if (param.value) {
-          const val = typeof param.value === 'string' ? param.value : String(param.value);
-          if (val.startsWith('0x')) {
-            // Check for excessively large values
-            const num = parseInt(val, 16);
-            if (num > BigInt('0x' + 'ff'.repeat(32))) {
-              errors.push('Excessive transaction value');
-            }
-          }
-        }
-      }
-    }
-  }
-  
-  return {
-    valid: errors.length === 0,
-    errors
-  };
-}
-
-/**
- * Validate API key
- */
-function validateApiKey(req) {
-  // No API key configured = allow all
-  if (!SECURITY.apiKey) {
-    return true;
-  }
-  
-  const providedKey = req.headers['x-api-key'] || 
-                      req.headers['authorization']?.replace('Bearer ', '');
-  
-  return providedKey === SECURITY.apiKey;
-}
-
-// Public RPC endpoints - no API key needed!
-const PUBLIC_RPCS = {
-  ethereum: [
-    'https://eth.llamarpc.com',
-    'https://rpc.ankr.com/eth',
-  ],
-  polygon: [
-    'https://polygon-rpc.com',
-    'https://rpc.ankr.com/polygon',
-  ],
-  bsc: [
-    'https://bsc-dataseed.binance.org',
-    'https://rpc.ankr.com/bsc',
-  ],
-  avalanche: [
-    'https://api.avax.network/ext/bc/C/rpc',
-    'https://rpc.ankr.com/avalanche',
-  ],
-  arbitrum: [
-    'https://arb1.arbitrum.io/rpc',
-    'https://rpc.ankr.com/arbitrum',
-  ],
-  optimism: [
-    'https://mainnet.optimism.io',
-    'https://rpc.ankr.com/optimism',
-  ],
-  solana: [
-    'https://api.mainnet-beta.solana.com',
-    'https://rpc.ankr.com/solana',
-  ],
-  bitcoin: [
-    'http://localhost:8332', // Requires Bitcoin Core
-  ]
+const CHAINS = {
+  ethereum: 'https://eth.llamarpc.com',
+  polygon: 'https://polygon-rpc.com',
+  bsc: 'https://bsc-dataseed.binance.org',
+  avalanche: 'https://api.avax.network/ext/bc/C/rpc',
+  arbitrum: 'https://arb1.arbitrum.io/rpc',
+  optimism: 'https://mainnet.optimism.io',
+  solana: 'https://api.mainnet-beta.solana.com'
 };
 
-/**
- * Get a working public RPC for a chain
- */
-async function getPublicRPC(chain) {
-  const rpcs = PUBLIC_RPCS[chain.toLowerCase()] || [];
-  
-  for (const rpc of rpcs) {
-    try {
-      // Test if it works
-      if (chain.toLowerCase() === 'bitcoin') {
-        // Can't test Bitcoin easily without credentials
-        return rpc;
-      }
-      const result = await makeRPCRequest(rpc, 'eth_blockNumber', []);
-      if (result !== null) {
-        console.log(`✅ Using ${chain}: ${rpc}`);
-        return rpc;
-      }
-    } catch (e) {
-      // Try next RPC
-    }
-  }
-  
-  // Default fallback
-  return rpcs[0] || null;
-}
+const CHAIN_IDS = {
+  ethereum: '0x1',
+  polygon: '0x89',
+  bsc: '0x38',
+  avalanche: '0xa86a',
+  arbitrum: '0xa4b1',
+  optimism: '0xa',
+  solana: '0x1'
+};
 
-/**
- * Ethereum/EVM Handler - Actually works!
- */
-class EthereumHandler {
-  constructor(rpcUrl, options = {}) {
-    this.rpcUrl = rpcUrl;
-    this.privateKey = options.privateKey || null;
-    this.demoMode = options.demoMode !== false;
-  }
+// ============================================
+// CORE ENGINE
+// ============================================
 
-  async submitBatch(transactions) {
-    const results = [];
-    
-    // Check queue size
-    if (transactions.length > SECURITY.maxBatchSize) {
-      console.warn(`⚠️  Batch size ${transactions.length} exceeds limit ${SECURITY.maxBatchSize}, truncating`);
-      transactions = transactions.slice(0, SECURITY.maxBatchSize);
-    }
-    
-    for (const tx of transactions) {
-      try {
-        if (this.demoMode) {
-          // Demo mode - just log
-          console.log(`📤 DEMO: Would send ${tx.to} (${tx.value || '0'} wei)`);
-          results.push(`tx_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`);
-        } else if (this.privateKey) {
-          // Real mode - would sign and send (needs implementation)
-          console.log(`📤 REAL: Would send ${tx.to} (${tx.value || '0'} wei)`);
-          results.push(`tx_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`);
-        } else {
-          // No private key - can't send
-          console.log(`📤 No private key configured, tx queued: ${tx.to}`);
-          results.push(`tx_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`);
-        }
-      } catch (e) {
-        console.error(`   ❌ Error: ${e.message}`);
-        results.push(null);
-      }
-    }
-    return results;
-  }
-
-  getShardForAddress(address, shardCount) {
-    const addr = (address || '').toLowerCase().replace('0x', '');
-    let hash = 0;
-    for (let i = 0; i < Math.min(40, addr.length); i++) {
-      hash = ((hash << 5) - hash) + addr.charCodeAt(i);
-      hash = hash & hash;
-    }
-    return Math.abs(hash) % shardCount;
-  }
-}
-
-/**
- * Bitcoin Handler
- */
-class BitcoinHandler {
-  constructor(config = {}) {
-    this.rpcUrl = config.rpcUrl || 'http://localhost:8332';
-    this.rpcUser = config.rpcUser;
-    this.rpcPass = config.rpcPass;
-    this.demoMode = config.demoMode !== false;
-  }
-
-  async submitBatch(transactions) {
-    const results = [];
-    for (const tx of transactions) {
-      try {
-        if (this.demoMode) {
-          console.log(`📤 DEMO: Would send BTC: ${tx.amount} to ${tx.to}`);
-        } else {
-          console.log(`📤 REAL: Would send BTC: ${tx.amount} to ${tx.to}`);
-        }
-        results.push(`btc_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`);
-      } catch (e) {
-        results.push(null);
-      }
-    }
-    return results;
-  }
-
-  getShardForAddress(address, shardCount) {
-    const addr = (address || '').toLowerCase();
-    let hash = 0;
-    for (const char of addr) {
-      hash = ((hash << 5) - hash) + char.charCodeAt(0);
-      hash = hash & hash;
-    }
-    return Math.abs(hash) % shardCount;
-  }
-}
-
-/**
- * Solana Handler
- */
-class SolanaHandler {
-  constructor(rpcUrl, options = {}) {
-    this.rpcUrl = rpcUrl || 'https://api.mainnet-beta.solana.com';
-    this.privateKey = options.privateKey || null;
-    this.demoMode = options.demoMode !== false;
-  }
-
-  async submitBatch(transactions) {
-    const results = [];
-    for (const tx of transactions) {
-      try {
-        if (this.demoMode) {
-          console.log(`📤 DEMO: Would send SOL: ${tx.amount} to ${tx.to}`);
-        } else {
-          console.log(`📤 REAL: Would send SOL: ${tx.amount} to ${tx.to}`);
-        }
-        results.push(`sol_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`);
-      } catch (e) {
-        results.push(null);
-      }
-    }
-    return results;
-  }
-
-  getShardForAddress(address, shardCount) {
-    const addr = (address || '').toLowerCase();
-    let hash = 0;
-    for (let i = 0; i < Math.min(44, addr.length); i++) {
-      hash = ((hash << 5) - hash) + addr.charCodeAt(0);
-      hash = hash & hash;
-    }
-    return Math.abs(hash) % shardCount;
-  }
-}
-
-/**
- * Make JSON-RPC request
- */
-function makeRPCRequest(rpcUrl, method, params) {
-  return new Promise((resolve, reject) => {
-    const body = JSON.stringify({ jsonrpc: '2.0', method, params, id: 1 });
-    const url = new URL(rpcUrl);
-    const lib = url.protocol === 'https:' ? https : http;
-
-    const req = lib.request({
-      hostname: url.hostname,
-      port: url.port || (url.protocol === 'https:' ? 443 : 80),
-      path: url.pathname,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
-    }, (res) => {
-      let data = '';
-      res.on('data', c => data += c);
-      res.on('end', () => {
-        try {
-          const p = JSON.parse(data);
-          resolve(p.result);
-        } catch (e) { reject(e); }
-      });
-    });
-    req.on('error', reject);
-    req.write(body);
-    req.end();
-  });
-}
-
-/**
- * Main BrixaScaler Class
- */
 class BrixaScaler {
-  constructor(chain, options = {}) {
+  constructor(chain) {
     this.chain = chain.toLowerCase();
-    this.options = {
-      shards: options.shards || 100,
-      batchSize: Math.min(options.batchSize || 1000, SECURITY.maxBatchSize),
-      batchInterval: options.batchInterval || 500,
-      demo: options.demo !== undefined ? options.demo : SECURITY.demoMode,
-      privateKey: options.privateKey || null
-    };
+    this.rpcUrl = CONFIG.rpcUrl || CHAINS[this.chain] || CHAINS.ethereum;
+    this.chainId = CHAIN_IDS[this.chain] || '0x1';
     
-    this.handler = null;
-    this.shards = new Array(this.options.shards).fill(null).map(() => []);
-    this.running = false;
-    this.processor = null;
-    this.totalQueued = 0;
+    this.queue = [];
+    this.processing = false;
+    this.stats = { received: 0, submitted: 0, failed: 0 };
+    
+    this.startProcessor();
   }
 
-  async start() {
-    if (this.running) return;
-    
-    // Auto-detect and use public RPC
-    console.log(`🚀 Starting BrixaScaler for ${this.chain}...`);
-    console.log(`🔒 Security: Rate limiting enabled (${SECURITY.rateLimit.maxRequests}/${SECURITY.rateLimit.windowMs/1000}s)`);
-    if (SECURITY.apiKey) {
-      console.log(`🔑 Security: API key required`);
-    }
-    console.log(this.options.demo 
-      ? `⚠️  DEMO MODE - Transactions will be queued but not sent to chain`
-      : `🔴 PRODUCTION MODE - Transactions will be sent to chain\n`);
-    
-    if (this.chain === 'bitcoin') {
-      this.handler = new BitcoinHandler({ demoMode: this.options.demo });
-    } else if (this.chain === 'solana') {
-      this.handler = new SolanaHandler(PUBLIC_RPCS.solana[0], { 
-        demoMode: this.options.demo,
-        privateKey: this.options.privateKey
-      });
-    } else {
-      const rpc = await getPublicRPC(this.chain);
-      if (rpc) {
-        this.handler = new EthereumHandler(rpc, {
-          demoMode: this.options.demo,
-          privateKey: this.options.privateKey
-        });
-      } else {
-        // Demo mode
-        console.log('⚠️ No public RPC, running in demo mode');
-        this.handler = new EthereumHandler(null, { demoMode: true });
-      }
-    }
-    
-    this.running = true;
-    this.processor = setInterval(() => this.processBatch(), this.options.batchInterval);
-    console.log(`✅ BrixaScaler running with ${this.options.shards} shards\n`);
+  startProcessor() {
+    setInterval(() => this.processBatch(), CONFIG.batchInterval);
   }
 
-  stop() {
-    this.running = false;
-    if (this.processor) clearInterval(this.processor);
-  }
-
-  submit(tx) {
-    // Check queue limit
-    if (this.totalQueued >= SECURITY.maxQueueSize) {
-      console.warn(`⚠️  Queue full (${SECURITY.maxQueueSize}), rejecting transaction`);
-      return null;
-    }
-    
-    const txId = `tx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const shardIndex = this.handler.getShardForAddress(tx.to || tx.from || '', this.options.shards);
-    this.shards[shardIndex].push({ ...tx, id: txId });
-    this.totalQueued++;
-    return txId;
+  addTransaction(tx) {
+    this.queue.push({ tx, addedAt: Date.now() });
+    this.stats.received++;
+    return `tx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
   async processBatch() {
-    for (let i = 0; i < this.shards.length; i++) {
-      const shard = this.shards[i];
-      if (shard.length === 0) continue;
-      const batch = shard.splice(0, this.options.batchSize);
-      await this.handler.submitBatch(batch);
-      this.totalQueued -= batch.length;
+    if (this.queue.length === 0 || this.processing) return;
+    
+    this.processing = true;
+    const batch = this.queue.splice(0, CONFIG.batchSize);
+    
+    console.log(`📦 Processing batch of ${batch.length} transactions...`);
+    
+    for (const item of batch) {
+      try {
+        await this.submitTransaction(item.tx);
+        this.stats.submitted++;
+      } catch (e) {
+        this.stats.failed++;
+        console.log(`❌ Failed: ${e.message}`);
+      }
     }
+    
+    this.processing = false;
+  }
+
+  async submitTransaction(tx) {
+    // Build the transaction
+    const params = tx;
+    
+    const payload = {
+      jsonrpc: '2.0',
+      method: 'eth_sendTransaction',
+      params: [params],
+      id: 1
+    };
+
+    return this.rpcCall(payload);
+  }
+
+  async rpcCall(payload) {
+    return new Promise((resolve, reject) => {
+      const u = new URL(this.rpcUrl);
+      const client = u.protocol === 'https:' ? https : http;
+      
+      const req = client.request({
+        hostname: u.hostname,
+        port: u.port || (u.protocol === 'https:' ? 443 : 80),
+        path: u.pathname || '/',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      }, res => {
+        let data = '';
+        res.on('data', c => data += c);
+        res.on('end', () => {
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.error) reject(new Error(parsed.error.message));
+            else resolve(parsed.result);
+          } catch (e) {
+            reject(e);
+          }
+        });
+      });
+      
+      req.on('error', reject);
+      req.write(JSON.stringify(payload));
+      req.end();
+    });
   }
 
   getStats() {
     return {
       chain: this.chain,
-      shards: this.options.shards,
-      queued: this.shards.reduce((s, shard) => s + shard.length, 0),
-      totalQueued: this.totalQueued,
-      running: this.running,
-      demoMode: this.options.demo,
-      security: {
-        apiKeyRequired: !!SECURITY.apiKey,
-        rateLimit: SECURITY.rateLimit
-      }
+      queued: this.queue.length,
+      received: this.stats.received,
+      submitted: this.stats.submitted,
+      failed: this.stats.failed
     };
   }
 }
 
-// Import ZK module
-const ZK = require('./zk-prover');
+// ============================================
+// SERVER
+// ============================================
 
-// Export
-module.exports = { 
-  BrixaScaler, 
-  EthereumHandler, 
-  BitcoinHandler, 
-  SolanaHandler, 
-  PUBLIC_RPCS, 
-  getPublicRPC,
-  SECURITY,
-  checkRateLimit,
-  validateRPCInput,
-  validateApiKey,
-  // ZK features
-  ZK,
-  TransactionCommitment: ZK.TransactionCommitment,
-  MerkleTree: ZK.MerkleTree,
-  BatchZKProof: ZK.BatchZKProof,
-  ZKBatchedScaler: ZK.ZKBatchedScaler
-};
+function startServer() {
+  const scaler = new BrixaScaler(CONFIG.chain);
 
-// Browser export
-if (typeof window !== 'undefined') {
-  window.BrixaScaler = BrixaScaler;
-  window.BrixaScaler.handlers = { EthereumHandler, BitcoinHandler, SolanaHandler };
-  window.BrixaScaler.PUBLIC_RPCS = PUBLIC_RPCS;
+  console.log('\n' + '═'.repeat(50));
+  console.log('💜 BrixaScaler - Transaction Batching');
+  console.log('═'.repeat(50));
+  console.log(`   Chain: ${CONFIG.chain}`);
+  console.log(`   RPC: ${scaler.rpcUrl}`);
+  console.log(`   Batch: ${CONFIG.batchSize} txs / ${CONFIG.batchInterval}ms`);
+  console.log('');
+
+  const server = http.createServer(async (req, res) => {
+    // CORS
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') {
+      res.writeHead(200);
+      res.end();
+      return;
+    }
+
+    // API Key
+    if (CONFIG.apiKey) {
+      const key = req.headers['x-api-key'];
+      if (key !== CONFIG.apiKey) {
+        res.writeHead(401);
+        res.end(JSON.stringify({ error: 'Unauthorized' }));
+        return;
+      }
+    }
+
+    // GET = Dashboard
+    if (req.method === 'GET') {
+      const s = scaler.getStats();
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(`
+<!DOCTYPE html>
+<html>
+<head>
+  <title>BrixaScaler</title>
+  <style>
+    body { font-family: monospace; background: #0d0d1a; color: #e0e0e0; padding: 40px; }
+    h1 { color: #ff2d75; }
+    .stats { display: flex; gap: 30px; margin: 30px 0; }
+    .stat { background: #1a1a2e; padding: 20px; border-radius: 10px; }
+    .stat-value { font-size: 2em; color: #00f5d4; }
+    .stat-label { color: #666; }
+    .info { color: #666; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h1>💜 BrixaScaler</h1>
+  <p>Transaction batching for ${s.chain}</p>
+  
+  <div class="stats">
+    <div class="stat"><div class="stat-value">${s.queued}</div><div class="stat-label">Queued</div></div>
+    <div class="stat"><div class="stat-value">${s.received}</div><div class="stat-label">Received</div></div>
+    <div class="stat"><div class="stat-value">${s.submitted}</div><div class="stat-label">Submitted</div></div>
+    <div class="stat"><div class="stat-value">${s.failed}</div><div class="stat-label">Failed</div></div>
+  </div>
+  
+  <p class="info">RPC: http://localhost:${CONFIG.port}</p>
+</body>
+</html>
+      `);
+      return;
+    }
+
+    // POST = JSON-RPC
+    if (req.method !== 'POST') {
+      res.writeHead(405);
+      res.end(JSON.stringify({ error: 'Method not allowed' }));
+      return;
+    }
+
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const rpc = JSON.parse(body);
+        const { method, params, id } = rpc;
+
+        if (method === 'eth_sendTransaction') {
+          const tx = params?.[0] || {};
+          const txId = scaler.addTransaction(tx);
+          console.log(`📨 Queued: ${txId}`);
+          res.end(JSON.stringify({ jsonrpc: '2.0', id, result: '0x' + txId }));
+          return;
+        }
+
+        if (method === 'eth_blockNumber') {
+          res.end(JSON.stringify({ jsonrpc: '2.0', id, result: '0x' + Math.floor(Date.now() / 1000).toString(16) }));
+          return;
+        }
+
+        if (method === 'eth_chainId') {
+          res.end(JSON.stringify({ jsonrpc: '2.0', id, result: scaler.chainId }));
+          return;
+        }
+
+        if (method === 'eth_estimateGas') {
+          res.end(JSON.stringify({ jsonrpc: '2.0', id, result: '0x5208' }));
+          return;
+        }
+
+        // Pass through
+        const result = await scaler.rpcCall(rpc);
+        res.end(JSON.stringify({ jsonrpc: '2.0', id, result }));
+
+      } catch (e) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
+  });
+
+  server.listen(CONFIG.port, () => {
+    console.log('🚀 Server running at http://localhost:' + CONFIG.port);
+    console.log('📡 Point wallet to http://localhost:' + CONFIG.port);
+    console.log('');
+  });
 }
+
+// ============================================
+// CLI
+// ============================================
+
+const args = process.argv.slice(2);
+for (let i = 0; i < args.length; i++) {
+  if (args[i] === '--chain' && args[i + 1]) CONFIG.chain = args[i + 1];
+  if (args[i] === '--rpc' && args[i + 1]) CONFIG.rpcUrl = args[i + 1];
+  if (args[i] === '--port' && args[i + 1]) CONFIG.port = parseInt(args[i + 1]);
+  if (args[i] === '--batch-size' && args[i + 1]) CONFIG.batchSize = parseInt(args[i + 1]);
+  if (args[i] === '--batch-interval' && args[i + 1]) CONFIG.batchInterval = parseInt(args[i + 1]);
+  if (args[i] === '--help') {
+    console.log('Usage: node brixa-scaler.js [options]');
+    console.log('');
+    console.log('Options:');
+    console.log('  --chain <name>       ethereum, polygon, bsc, avalanche, arbitrum, optimism');
+    console.log('  --rpc <url>          Custom RPC URL');
+    console.log('  --port <n>           Port (default 8545)');
+    console.log('  --batch-size <n>    Txs per batch (default 100)');
+    console.log('  --batch-interval <ms>  Batch interval (default 1000)');
+    process.exit(0);
+  }
+}
+
+startServer();
+
+module.exports = { BrixaScaler, CONFIG, CHAINS };
