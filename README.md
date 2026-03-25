@@ -21,6 +21,33 @@ No presets. No defaults. You bring the RPC, BrixaScaler adds the batching + ZK.
 
 ---
 
+## Bitcoin Setup
+
+Bitcoin is different - no public HTTP RPCs like Ethereum. You need a local node:
+
+### Option 1: Run bitcoind (Recommended)
+
+```bash
+# 1. Install Bitcoin Core
+# Download from https://bitcoin.org/en/download
+
+# 2. Run bitcoind with RPC enabled
+bitcoind -server -rpcuser=youruser -rpcpassword=yourpass -rpcport=8332
+
+# 3. Start BrixaScaler
+node brixa-scaler.js --rpc http://youruser:yourpass@localhost:8332
+```
+
+### Option 2: Use a Bitcoin API (read-only)
+
+Some APIs work for reading, but for sending transactions you need a local node.
+
+---
+
+## Other Chains
+
+---
+
 ## What It Does
 
 ```
