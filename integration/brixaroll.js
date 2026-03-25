@@ -193,7 +193,65 @@ class Worker {
   }
 
   async submitProofToChain(proof) {
-    // In production, submit to chain
+    if (CONFIG.demoMode) {
+      console.log(`📤 [L1 Submit] Demo mode - would submit proof to ${CONFIG.rollupContract}`);
+      console.log(`   Root: ${proof.root?.slice(0, 16)}...`);
+      console.log(`   TXs:  ${proof.txCount}`);
+      return { success: true, demo: true };
+    }
+
+    if (!CONFIG.rpcUrl || CONFIG.rollupContract === '0x0000000000000000000000000000000000000000') {
+      console.log('⚠️ No RPC or contract - skipping L1 submission');
+      return { success: false, error: 'No RPC or contract' };
+    }
+
+    try {
+      const { ethers } = require('ethers');
+      const provider = new ethers.JsonRpcProvider(CONFIG.rpcUrl);
+      
+      // Get private key from env
+      const privateKey = process.env.SEQUENCER_PRIVATE_KEY;
+      if (!privateKey) {
+        console.log('⚠️ No private key - cannot submit to L1');
+        return { success: false, error: 'No private key' };
+      }
+      
+      const signer = new ethers.Wallet(privateKey, provider);
+      
+      // Rollup contract ABI
+      const abi = [
+        'function submitBatch(uint256[2] proofA, uint256[2][2] proofB, uint256[2] proofC, uint256[4] input, bytes transactions) external'
+      ];
+      
+      const contract = new ethers.Contract(CONFIG.rollupContract, abi, signer);
+      
+      // Prepare proof and input
+      const input = [
+        proof.previousRoot || '0x' + '0'.repeat(64),
+        proof.root,
+        proof.batchHash,
+        proof.batchId || 0
+      ];
+      
+      const transactions = proof.transactions || '0x';
+      
+      // Submit to L1
+      const tx = await contract.submitBatch(
+        [0, 0],          // proofA
+        [[0, 0], [0, 0]], // proofB
+        [0, 0],          // proofC
+        input,           // [prevRoot, newRoot, dataHash, batchId]
+        transactions,   // compressed tx data
+        { gasLimit: 500000 }
+      );
+      
+      console.log(`✅ Proof submitted to L1: ${tx.hash}`);
+      return { success: true, txHash: tx.hash };
+      
+    } catch (e) {
+      console.error('❌ L1 submission failed:', e.message);
+      return { success: false, error: e.message };
+    }
   }
 
   queue(tx) {
@@ -271,27 +329,62 @@ if (cluster.isMaster) {
   }
 
   console.log(`   📡 RPC: ${CONFIG.rpcUrl}`);
+  console.log(`   📜 Contract: ${CONFIG.rollupContract === '0x0000000000000000000000000000000000000000' ? '(not set)' : CONFIG.rollupContract}`);
   console.log(`   👷 Workers: ${CONFIG.workers} (parallel processes!)`);
   console.log(`   🔀 Shards/worker: ${CONFIG.shards}`);
   console.log(`   📦 Batch size: ${CONFIG.batchSize}`);
   console.log(`   ⚡ Theoretical max: ${(CONFIG.workers * CONFIG.shards * CONFIG.batchSize / (CONFIG.batchInterval/1000)).toLocaleString()} TPS`);
   console.log(`   🔒 ZK: ${CONFIG.demoMode ? 'DEMO' : 'LIVE'}`);
   console.log('');
-  console.log('   Starting workers...');
 
-  const workers = [];
-  for (let i = 0; i < CONFIG.workers; i++) {
-    const w = cluster.fork({ 
-      WORKER_ID: i, 
-      RPC_URL: CONFIG.rpcUrl,
-      SHARDS: CONFIG.shards,
-      BATCH_SIZE: CONFIG.batchSize,
-      BATCH_INTERVAL: CONFIG.batchInterval,
+  // Sync from L1 if contract is set
+  async function syncFromL1() {
+    if (CONFIG.rollupContract === '0x0000000000000000000000000000000000000000' || !CONFIG.rpcUrl) {
+      console.log('   ⏭️  Skipping L1 sync (no contract)');
+      return;
+    }
+    
+    console.log('   🔄 Syncing from L1...');
+    try {
+      const { ethers } = require('ethers');
+      const provider = new ethers.JsonRpcProvider(CONFIG.rpcUrl);
+      
+      const contract = new ethers.Contract(
+        CONFIG.rollupContract,
+        ['function currentStateRoot() view returns (bytes32)', 'function batchCount() view returns (uint256)'],
+        provider
+      );
+      
+      const [stateRoot, batchCount] = await Promise.all([
+        contract.currentStateRoot(),
+        contract.batchCount()
+      ]);
+      
+      console.log(`   ✅ L1 State: ${batchCount} batches, root: ${stateRoot.slice(0, 18)}...`);
+    } catch (e) {
+      console.log(`   ⚠️  L1 sync failed: ${e.message.slice(0, 50)}`);
+    }
+  }
+  
+  syncFromL1().then(() => {
+    console.log('   Starting workers...');
+
+    const workers = [];
+    for (let i = 0; i < CONFIG.workers; i++) {
+      const w = cluster.fork({ 
+        WORKER_ID: i, 
+        RPC_URL: CONFIG.rpcUrl,
+        SHARDS: CONFIG.shards,
+        BATCH_SIZE: CONFIG.batchSize,
+        BATCH_INTERVAL: CONFIG.batchInterval,
       DEMO_MODE: CONFIG.demoMode
     });
     workers.push(w);
     console.log(`   ✅ Started worker ${i + 1}/${CONFIG.workers}`);
   }
+
+  // Close the async function
+  });  // End of syncFromL1().then()
 
   // Create dashboard server on master
   const server = http.createServer((req, res) => {
