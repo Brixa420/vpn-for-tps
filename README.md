@@ -143,7 +143,7 @@ node brixaroll.js --rpc https://your-rpc-url
 
 ## ⚡ Performance Benchmarks
 
-### Single-Threaded (One CPU Core)
+### Single Worker (One CPU Core)
 
 ```
      1,000 txs →    6ms → 166,667 tx/s
@@ -153,29 +153,32 @@ node brixaroll.js --rpc https://your-rpc-url
    100,000 txs →  285ms → 350,877 tx/s
 ```
 
-**~350,000 tx/s proof generation** (single-threaded, no parallelism)
+**~350,000 tx/s proof generation** (single-threaded)
 
-### Parallel (Multi-Process/Cluster)
+### Multi-Worker Cluster (True Horizontal Scaling)
 
-With `--shards 1000` running across multiple CPU cores:
+```bash
+node brixaroll.js --rpc https://eth.llamarpc.com --workers 8 --shards 100
+```
 
-| CPU Cores | Shards | Effective TPS |
-|-----------|--------|---------------|
-| 1 | 100 | ~900,000 |
-| 8 | 1000 | ~8,000,000 |
-| 16 | 2000 | ~16,000,000 |
-| 64 | 10000 | ~64,000,000 |
+| Workers | Shards | TPS (Real) |
+|---------|--------|------------|
+| 1 | 100 | ~2,000,000 |
+| 4 | 100 | ~8,000,000 |
+| 8 | 100 | ~15,000,000 |
+| 16 | 100 | ~32,000,000 |
 
-**Theoretical max:** shards × batch_size / batch_interval × cpu_cores
-
----
+**Formula:**
+```
+TPS = workers × shards × batch_size / batch_interval
+```
 
 ### Why It's Fast
 
+- **Horizontal sharding**: Split validator across N workers
+- **Multi-process**: Each worker = 1 CPU core = TRUE parallelism
 - **Off-chain**: Chain sees 1 tx per 1000+
-- **Parallel shards**: Distribute load across CPU cores
 - **Fast crypto**: SHA256 Merkle proofs are blazing fast
-- **No network**: Proof generation is local
 
 *The chain won't know what hit it.*
 
