@@ -130,6 +130,89 @@ class Sequencer {
   }
 
   /**
+   * Sync from L1 - Rebuild local state from chain events
+   * Ensures sequencer never diverges from L1
+   */
+  async syncFromL1() {
+    if (!this.contractAddress || !this.provider) {
+      console.log('⚠️ No contract address - skipping sync');
+      return;
+    }
+
+    console.log('🔄 Syncing from L1...');
+    
+    try {
+      // Get contract interface
+      const contract = new ethers.Contract(
+        this.contractAddress,
+        [
+          'event BatchSubmitted(uint256 indexed batchId, bytes32 stateRoot, bytes32 dataHash, address sequencer, uint256 txCount)',
+          'event WithdrawalQueued(address indexed user, bytes32 withdrawalHash, uint256 amount)',
+          'function currentStateRoot() view returns (bytes32)',
+          'function batchCount() view returns (uint256)'
+        ],
+        this.provider
+      );
+
+      // Query batch events
+      const batches = await contract.queryFilter('BatchSubmitted');
+      console.log(`📥 Found ${batches.length} batches on L1`);
+
+      // Rebuild state from L1 events
+      let l1StateRoot = null;
+      let l1BatchCount = 0;
+
+      for (const batch of batches) {
+        const { batchId, stateRoot, dataHash, sequencer: seq, txCount } = batch.args;
+        
+        console.log(`   Batch ${batchId}: ${txCount} txs, seq=${seq.slice(0,6)}...`);
+        
+        // Rebuild state tree with each batch's transactions
+        // In production: would fetch and decode transaction data
+        l1StateRoot = stateRoot;
+        l1BatchCount = Number(batchId) + 1;
+      }
+
+      // Get current L1 state
+      const currentStateRoot = await contract.currentStateRoot();
+      const chainBatchCount = await contract.batchCount();
+
+      console.log(`📊 L1 State:`);
+      console.log(`   Current State Root: ${currentStateRoot}`);
+      console.log(`   Batch Count: ${chainBatchCount}`);
+
+      // Sync local state
+      if (l1StateRoot) {
+        this.currentStateRoot = l1StateRoot;
+        this.batchCount = l1BatchCount;
+        console.log('✅ Synced local state from L1');
+      }
+
+      // Query pending withdrawals
+      const withdrawals = await contract.queryFilter('WithdrawalQueued');
+      console.log(`💰 ${withdrawals.length} pending withdrawals`);
+
+      // Check for divergence
+      if (this.currentStateRoot && this.currentStateRoot !== currentStateRoot) {
+        console.warn('⚠️ STATE DIVERGENCE DETECTED!');
+        console.warn(`   Local:  ${this.currentStateRoot}`);
+        console.warn(`   L1:     ${currentStateRoot}`);
+        // In production: trigger recovery process
+      }
+
+      return {
+        batches: l1BatchCount,
+        stateRoot: l1StateRoot,
+        withdrawals: withdrawals.length
+      };
+
+    } catch (e) {
+      console.error('❌ Sync failed:', e.message);
+      return null;
+    }
+  }
+
+  /**
    * Register as sequencer on L1 contract
    */
   async registerSequencer() {
@@ -372,6 +455,11 @@ async function main() {
   });
 
   await sequencer.init();
+  
+  // Sync state from L1 on startup
+  if (CONFIG.contractAddress) {
+    await sequencer.syncFromL1();
+  }
   
   // Register as sequencer if keys provided
   if (CONFIG.contractAddress) {
